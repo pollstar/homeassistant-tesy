@@ -95,7 +95,7 @@ On devices that report weekly programs (`prgP1MO` … `prgP3SU`, e.g. ModEco 2 /
 | `active_program` | `1`-`3` while a program runs, otherwise `null` |
 | `manual_temperature` | Setpoint kept for manual mode (`tmpT`) |
 
-While a program runs, the target temperature (entity and `Target Temperature` sensor) is taken from the program for the current hour of the device clock, because the firmware reports a placeholder (`9`) in `tmpR` in those modes.
+While a program runs without Boost, the target temperature (entity and `Target Temperature` sensor) is taken from the program for the current hour of the device clock, because the firmware reports a placeholder (`9`) in `tmpR` in that case. With Boost on, `tmpR` holds the real target (75 °C) and is used as is.
 
 Programs can be written with the `tesy.set_schedule` action:
 
@@ -125,7 +125,7 @@ Each day is a 24-byte hex string on the device and is written with `/api?name=pr
 | `mode` | Operation mode | Water heater |
 | `tmpC` | Current temperature / showers | Temperature sensor |
 | `tmpT` | Target temperature setpoint | Water heater |
-| `tmpR` | Active target temperature (placeholder `9` while a program runs) | Target Temperature sensor |
+| `tmpR` | Active target temperature (placeholder `9` while a program runs without Boost) | Target Temperature sensor |
 | `date` | Device local time | Program target lookup |
 | `prgP{1-3}{MO..SU}` | Weekly programs, 24 bytes hex per day, °C per hour, `FF` = empty | Schedule attributes, `tesy.set_schedule` |
 | `ht` | Heating element active | `is_heating` attr |

@@ -82,6 +82,14 @@ class ActiveTargetTest(TestCase):
         self.assertEqual(schedule.active_target(device_data(mode="1", tmp_r="9")), 14.0)
         self.assertEqual(schedule.active_target(device_data(mode="2", tmp_r="9")), 19.0)
 
+    def test_boost_in_program_uses_tmp_r(self):
+        # P1 at 23:57 with Boost on: firmware reports the real target (75).
+        data = device_data(mode="1", date="2026-10-13 23:57:03", tmp_r="75")
+        data["bst"] = "1"
+        self.assertEqual(schedule.active_target(data), 75.0)
+        data.update({"bst": "0", "tmpR": "9"})
+        self.assertEqual(schedule.active_target(data), 14.0)
+
     def test_program_hour_lookup(self):
         data = device_data(mode="1", date="2026-10-13 13:05:00", tmp_r="9")
         self.assertEqual(schedule.active_target(data), 75.0)

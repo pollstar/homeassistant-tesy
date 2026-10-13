@@ -131,12 +131,14 @@ def active_program(data: dict[str, Any]) -> int | None:
 def active_target(data: dict[str, Any], now: datetime | None = None) -> float | None:
     """Return the target the device is working towards right now.
 
-    ``tmpR`` holds it in manual and Eco modes, but while a weekly program runs
-    the ModEco 2 (id 2004) firmware reports a placeholder there (``9``), so the
-    value is taken from the program for the current hour instead.
+    ``tmpR`` holds it in manual and Eco modes and while Boost is active. While a
+    weekly program runs without Boost, the ModEco 2 (id 2004) firmware reports a
+    placeholder there (``9``), so the value is taken from the program for the
+    current hour instead.
     """
     program = active_program(data)
-    if program is not None and has_schedules(data):
+    boost = str(data.get("bst")) == "1"
+    if program is not None and not boost and has_schedules(data):
         target = scheduled_target(data, program, now)
         return None if target is None else float(target)
 
