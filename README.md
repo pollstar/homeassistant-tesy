@@ -36,11 +36,12 @@ entity: water_heater.boiler_modeco_2_heater
 # optional
 name: Boiler
 subtitle: ModEco 2 · 100 L
-animation: false   # turn off the heating animation
+animation: always  # auto (default: off when the system asks for reduced motion) | always | off
 ```
 
 - Dial with the current water temperature and the active target; the drag handle sets the manual setpoint (manual mode only).
-- Operation modes, Boost and power; a subtle animation while the element heats (off when the system asks for reduced motion).
+- Operation modes, Boost and power; a subtle animation while the element heats (by default off when the system asks for reduced motion; `animation: always` forces it).
+- After a setpoint change the heating status is shown right away and confirmed by a poll of the heater ~2 s after every command.
 - **Schedule** dialog: P1-P3 as a 7×24 grid (landscape) or day by day (portrait / narrow screens), with a temperature brush (15-75 °C, or snowflake = heating off), copying a day to other days and writing through `tesy.set_schedule`.
 - **Statistics** dialog: energy, errors, Wi-Fi, uptime, firmware and clock status.
 - Follows the Home Assistant light/dark theme; Russian, Ukrainian and English.

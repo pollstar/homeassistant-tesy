@@ -10,7 +10,7 @@
  *   entity: water_heater.boiler_modeco_2_heater
  */
 
-export const CARD_VERSION = "0.1.1";
+export const CARD_VERSION = "0.1.2";
 
 export const DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 export const MODES = ["performance", "p1", "p2", "p3", "eco", "ec2", "ec3"];
@@ -358,6 +358,17 @@ class TesyBoilerCard extends Base {
 
     const boostOn = hass.states[this._ents.boost]?.state === "on";
     const v = heaterView(stateObj, boostOn);
+    // Right after a setpoint change, show the expected heating state until the
+    // heater reports back (the integration polls it ~2 s after a command).
+    const opt = this._optimistic;
+    if (opt && Date.now() < opt.until && !(Date.parse(stateObj.last_updated) > opt.since + 1500)) {
+      if (v.power && v.manual && !boostOn && v.current !== null) {
+        v.heating = v.current < opt.target - 0.5;
+        v.status = v.heating ? "heating" : "reached";
+      }
+    } else if (opt) {
+      this._optimistic = null;
+    }
     this._view = v;
     const rssi = hass.states[this._ents.wifi_signal]?.state;
     const device = this._ents.device;
@@ -372,7 +383,9 @@ class TesyBoilerCard extends Base {
     const setpoint = this._pendingTarget ?? (v.manual && manualSet !== null ? Number(manualSet) : null);
     const hasHandle = v.power && v.manual && setpoint !== null;
     const curAngle = v.current === null ? -135 : Math.max(-134, angleFor(v.current));
-    const animate = v.heating && this._config.animation !== false && !reducedMotion();
+    const anim = this._config.animation;
+    const animate = v.heating && anim !== false && anim !== "off"
+      && (anim === true || anim === "always" || !reducedMotion());
     const [hx, hy] = hasHandle ? pointAt(angleFor(setpoint)) : [0, 0];
     const [bx, by] = pointAt(angleFor(75));
 
@@ -410,7 +423,7 @@ class TesyBoilerCard extends Base {
               ${v.current !== null ? `<path d="${arcPath(-135, curAngle)}" fill="none" stroke-width="22" stroke-linecap="round" style="stroke: var(--t-heat)"></path>` : ""}
               ${animate && v.current !== null ? `<path d="${arcPath(-135, curAngle)}" pathLength="100" fill="none" stroke-width="12" stroke-linecap="round" stroke-dasharray="18 120" stroke-dashoffset="18" style="stroke: rgb(255,238,205); opacity: .8"><animate attributeName="stroke-dashoffset" from="18" to="-100" dur="${boostOn ? "1.8s" : "3s"}" repeatCount="indefinite"></animate></path>` : ""}
               ${v.power && boostOn ? `<circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="5" style="fill: var(--t-warm-fg)"></circle>` : ""}
-              ${hasHandle ? `<g class="handle"><circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="19" stroke-width="4" style="fill: var(--t-inv-bg); stroke: var(--ha-card-background, var(--card-background-color, #171b20))"></circle><text x="${hx.toFixed(1)}" y="${hy.toFixed(1)}" dy="0.35em" text-anchor="middle" style="fill: var(--t-inv-fg); font-size: 14px; font-weight: 600">${setpoint}</text></g>` : ""}
+              ${hasHandle ? `<circle class="handle" cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="15" stroke-width="8" style="fill: var(--ha-card-background, var(--card-background-color, #ffffff)); stroke: var(--t-inv-bg)"></circle>` : ""}
             </svg>
             <div class="center">
               <div class="cur num">${formatCurrent(v.current, hass)}<span>°C</span></div>
@@ -456,14 +469,10 @@ class TesyBoilerCard extends Base {
     };
     const show = (t) => {
       const [x, y] = pointAt(angleFor(t));
-      const g = svg.querySelector(".handle");
-      g.querySelector("circle").setAttribute("cx", x.toFixed(1));
-      g.querySelector("circle").setAttribute("cy", y.toFixed(1));
-      g.querySelector("circle").setAttribute("r", this._drag ? "22" : "19");
-      const text = g.querySelector("text");
-      text.setAttribute("x", x.toFixed(1));
-      text.setAttribute("y", y.toFixed(1));
-      text.textContent = t;
+      const handle = svg.querySelector(".handle");
+      handle.setAttribute("cx", x.toFixed(1));
+      handle.setAttribute("cy", y.toFixed(1));
+      handle.setAttribute("r", this._drag ? "18" : "15");
       svg.setAttribute("aria-valuenow", t);
       const tgt = this.shadowRoot.querySelector(".tgt");
       if (tgt && !(this._hass.states[this._ents.boost]?.state === "on")) tgt.textContent = `${t} °C`;
@@ -497,6 +506,10 @@ class TesyBoilerCard extends Base {
   async _commit(t) {
     if (t === undefined || t === null) return;
     this._pendingTarget = t;
+    const now = Date.now();
+    this._optimistic = { target: t, since: now, until: now + 15000 };
+    clearTimeout(this._optimisticTimer);
+    this._optimisticTimer = setTimeout(() => this._render(), 15100);
     clearTimeout(this._pendingTimer);
     this._pendingTimer = setTimeout(() => { this._pendingTarget = undefined; this._render(); }, 8000);
     try {

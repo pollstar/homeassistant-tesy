@@ -5,7 +5,8 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Any
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .tesy import Tesy
@@ -33,6 +34,7 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         else:
             self._client = Tesy(data)
         self._posix_tz_cache: dict[str, str | None] = {}
+        self._refresh_unsub = None
 
         super().__init__(
             hass,
@@ -93,6 +95,24 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return await self.hass.async_add_executor_job(
             self._client.set_schedule, key, val
         )
+
+    @callback
+    def async_refresh_soon(self, delay: float = 2.0) -> None:
+        """Poll the heater shortly after a command.
+
+        The command reply only echoes the written field; heating state (ht),
+        the active target (tmpR) and the like follow on the next poll, which
+        would otherwise be up to UPDATE_INTERVAL seconds away.
+        """
+        if self._refresh_unsub:
+            self._refresh_unsub()
+
+        @callback
+        def _run(_now) -> None:
+            self._refresh_unsub = None
+            self.hass.async_create_task(self.async_request_refresh())
+
+        self._refresh_unsub = async_call_later(self.hass, delay, _run)
 
     @property
     def supports_timezone(self) -> bool:

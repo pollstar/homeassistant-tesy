@@ -125,6 +125,8 @@ class TesyEntity(CoordinatorEntity[TesyCoordinator]):
             await self.partially_update_data_from_api(response, ATTR_CHILD_LOCK)
 
     async def partially_update_data_from_api(self, response, *keys):
+        # Whatever the reply, read the full state back soon after a command.
+        self.coordinator.async_refresh_soon()
         if ATTR_API not in response or response[ATTR_API] != "OK":
             return
 
