@@ -51,9 +51,17 @@
         "name": "Child Lock"
       }
     },
+    "binary_sensor": {
+      "clock_problem": {
+        "name": "Clock problem"
+      }
+    },
     "button": {
       "energy_reset": {
         "name": "Reset Consumed Energy"
+      },
+      "sync_timezone": {
+        "name": "Sync time zone"
       }
     },
     "water_heater": {

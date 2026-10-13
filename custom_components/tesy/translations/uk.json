@@ -31,7 +31,11 @@
       "boost": { "name": "Турбо" },
       "child_lock": { "name": "Дитячий замок" }
     },
+    "binary_sensor": {
+      "clock_problem": { "name": "Проблема з годинником" }
+    },
     "button": {
+      "sync_timezone": { "name": "Синхронізувати часовий пояс" },
       "energy_reset": { "name": "Скинути спожиту енергію" }
     },
     "water_heater": {

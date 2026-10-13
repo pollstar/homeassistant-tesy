@@ -51,9 +51,17 @@
         "name": "Детская блокировка"
       }
     },
+    "binary_sensor": {
+      "clock_problem": {
+        "name": "Проблема с часами"
+      }
+    },
     "button": {
       "energy_reset": {
         "name": "Сброс потребленной энергии"
+      },
+      "sync_timezone": {
+        "name": "Синхронизировать часовой пояс"
       }
     },
     "water_heater": {

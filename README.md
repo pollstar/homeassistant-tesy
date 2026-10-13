@@ -111,6 +111,19 @@ data:
 
 Each day is a 24-byte hex string on the device and is written with `/api?name=prgP3MO&set=<48 hex chars>`.
 
+### Clock and time zone
+
+Weekly programs run on the heater's own clock. The module takes UTC from the network and converts it to local time with a POSIX TZ string in `tz` (e.g. `EET-2EEST,M3.5.0/3,M10.5.0/4`); the time itself cannot be set over the API, only `tz`.
+
+On devices that expose `tz` the integration keeps it in step with Home Assistant's time zone: on start-up and whenever the HA time zone changes it writes the matching POSIX string (taken from the tz database) if the heater differs.
+
+| Entity | Description |
+|--------|-------------|
+| `binary_sensor.clock_problem` | On if `tz` differs from HA's zone or the heater clock is more than 5 minutes off HA (e.g. no internet). Attributes: `problems`, `device_time`, `offset_seconds`, `timezone`, `expected_timezone` |
+| `button.sync_timezone` | Writes HA's time zone to the heater now |
+
+If the clock is off with the right time zone, the module has no internet; set the time on the panel (hold **i** in standby) or restore the connection.
+
 ### Buttons
 
 | Entity | Description |
@@ -126,7 +139,8 @@ Each day is a 24-byte hex string on the device and is written with `/api?name=pr
 | `tmpC` | Current temperature / showers | Temperature sensor |
 | `tmpT` | Target temperature setpoint | Water heater |
 | `tmpR` | Active target temperature (placeholder `9` while a program runs without Boost) | Target Temperature sensor |
-| `date` | Device local time | Program target lookup |
+| `date` | Device local time (read-only, only in `_all`) | Program target lookup, clock check |
+| `tz` | POSIX time zone used for local time (writable) | Time zone sync |
 | `prgP{1-3}{MO..SU}` | Weekly programs, 24 bytes hex per day, °C per hour, `FF` = empty | Schedule attributes, `tesy.set_schedule` |
 | `ht` | Heating element active | `is_heating` attr |
 | `bst` | Boost flag | Boost switch |

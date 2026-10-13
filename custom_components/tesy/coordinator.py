@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .tesy import Tesy
+from .timezone import TZ_FIELD, posix_tz_for
 from .tesy_oldapi import TesyOldApi
 from .const import (
     ATTR_API,
@@ -31,6 +32,7 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._client = TesyOldApi(data)
         else:
             self._client = Tesy(data)
+        self._posix_tz_cache: dict[str, str | None] = {}
 
         super().__init__(
             hass,
@@ -91,6 +93,53 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return await self.hass.async_add_executor_job(
             self._client.set_schedule, key, val
         )
+
+    @property
+    def supports_timezone(self) -> bool:
+        """Return True if the device exposes a writable POSIX time zone."""
+        return not self.is_old_api and TZ_FIELD in (self.data or {})
+
+    @property
+    def expected_timezone(self) -> str | None:
+        """POSIX TZ string for Home Assistant's zone, once resolved."""
+        return self._posix_tz_cache.get(self.hass.config.time_zone)
+
+    async def async_expected_timezone(self) -> str | None:
+        """Return the POSIX TZ string matching Home Assistant's time zone."""
+        name = self.hass.config.time_zone
+        if name not in self._posix_tz_cache:
+            self._posix_tz_cache[name] = await self.hass.async_add_executor_job(
+                posix_tz_for, name
+            )
+        return self._posix_tz_cache[name]
+
+    async def async_sync_timezone(self) -> bool:
+        """Write Home Assistant's time zone to the device if it differs.
+
+        Returns True if the device was changed.
+        """
+        if not self.supports_timezone:
+            return False
+        expected = await self.async_expected_timezone()
+        if expected is None:
+            raise ValueError(
+                f"No POSIX time zone found for {self.hass.config.time_zone}"
+            )
+        if self.data.get(TZ_FIELD) == expected:
+            return False
+
+        response = await self.hass.async_add_executor_job(
+            self._client.set_timezone, expected
+        )
+        if response.get(ATTR_API) != "OK" or response.get(TZ_FIELD) != expected:
+            raise ConnectionError(f"Heater rejected time zone {expected}: {response}")
+
+        _LOGGER.info(
+            "Tesy time zone changed from %s to %s", self.data.get(TZ_FIELD), expected
+        )
+        self.data[TZ_FIELD] = expected
+        self.async_set_updated_data(self.data)
+        return True
 
     async def async_reset_energy_counter(self) -> dict[str, Any]:
         """Reset the resettable energy counter."""
