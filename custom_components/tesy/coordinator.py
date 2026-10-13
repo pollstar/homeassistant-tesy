@@ -27,7 +27,12 @@ _LOGGER = logging.getLogger(__name__)
 class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Tesy Coordinator class."""
 
-    def __init__(self, data: dict[str, Any], hass: HomeAssistant) -> None:
+    def __init__(
+        self,
+        data: dict[str, Any],
+        hass: HomeAssistant,
+        scan_interval: int = UPDATE_INTERVAL,
+    ) -> None:
         """Initialize."""
         if data.get(USE_OLD_API):
             self._client = TesyOldApi(data)
@@ -40,7 +45,7 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(seconds=UPDATE_INTERVAL),
+            update_interval=timedelta(seconds=scan_interval),
         )
 
     def _validate(self) -> None:

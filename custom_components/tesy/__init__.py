@@ -17,6 +17,8 @@ from homeassistant.helpers.typing import ConfigType
 from .coordinator import TesyCoordinator
 from .const import (
     DOMAIN,
+    SCAN_INTERVAL,
+    UPDATE_INTERVAL,
 )
 
 PLATFORMS: list[Platform] = [
@@ -61,6 +63,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = TesyCoordinator(
         entry.data,
         hass,
+        scan_interval=entry.options.get(SCAN_INTERVAL, UPDATE_INTERVAL),
     )
 
     try:
@@ -76,6 +79,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await coordinator.async_expected_timezone()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
     if coordinator.supports_timezone:
         # Keep the heater's time zone (it drives the weekly programs) in step
@@ -91,6 +95,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
 
     return True
+
+
+async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Apply a new poll interval."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def _async_sync_timezone(coordinator: TesyCoordinator) -> None:

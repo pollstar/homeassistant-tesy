@@ -26,6 +26,10 @@ Temperature setpoint is only used in manual (Performance) mode. In any other mod
 
 <img src="https://github.com/krasnoukhov/homeassistant-tesy/assets/944286/a08289f7-d7cc-49a0-9747-9fbd765e58d1" alt="heater" width="400">
 
+## Poll interval
+
+The heater is read every 30 seconds by default, so changes made on its panel or in the MyTESY app show up in Home Assistant (and on the card) within that time. To make it faster, open the integration → **Configure** and set **Poll interval** (5-300 s); 10 s is a good value for a local device. After any command from Home Assistant the heater is also read again ~2 s later.
+
 ## Lovelace card
 
 The integration ships its own thermostat card, `custom:tesy-boiler-card`. It is served and loaded by the integration, so there is nothing else to install: after updating, restart Home Assistant and reload the browser.

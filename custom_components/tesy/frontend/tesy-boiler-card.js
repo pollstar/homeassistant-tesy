@@ -10,7 +10,7 @@
  *   entity: water_heater.boiler_modeco_2_heater
  */
 
-export const CARD_VERSION = "0.1.3";
+export const CARD_VERSION = "0.1.4";
 
 export const DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 export const MODES = ["performance", "p1", "p2", "p3", "eco", "ec2", "ec3"];
@@ -612,7 +612,10 @@ class TesyBoilerDialog extends Base {
   set hass(hass) {
     const old = this._hass;
     this._hass = hass;
-    if (!this._edit && this._kind === "schedule") this._loadSchedule();
+    if (this._kind === "schedule") {
+      if (!this._edit) this._loadSchedule();
+      else if (!this._dirtyDays().length && !this._st.saving) this._syncSchedule();
+    }
     const ids = [this._config.entity, ...Object.values(this._ents).filter((v) => typeof v === "string")];
     if (!old || old.themes?.darkMode !== hass.themes?.darkMode || ids.some((id) => old.states[id] !== hass.states[id])) {
       this._render();
@@ -639,6 +642,17 @@ class TesyBoilerDialog extends Base {
     const dev = this._deviceNow();
     this._st.day = dev ? DAYS[(dev.getDay() + 6) % 7] : "mo";
     this._st.copySrc = this._st.day;
+  }
+
+  /** Pick up programs changed elsewhere (panel, MyTESY) while nothing is edited. */
+  _syncSchedule() {
+    const a = this._hass.states[this._config.entity]?.attributes || {};
+    const fresh = {};
+    for (const p of [1, 2, 3]) if (a[`schedule_p${p}`]) fresh[p] = a[`schedule_p${p}`];
+    if (!Object.keys(fresh).length || JSON.stringify(fresh) === JSON.stringify(this._original)) return;
+    this._original = fresh;
+    this._edit = JSON.parse(JSON.stringify(fresh));
+    if (!this._edit[this._st.prog]) this._st.prog = Number(Object.keys(fresh)[0]);
   }
 
   _deviceNow() {
