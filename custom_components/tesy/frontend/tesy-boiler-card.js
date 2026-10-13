@@ -10,7 +10,7 @@
  *   entity: water_heater.boiler_modeco_2_heater
  */
 
-export const CARD_VERSION = "0.1.0";
+export const CARD_VERSION = "0.1.1";
 
 export const DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 export const MODES = ["performance", "p1", "p2", "p3", "eco", "ec2", "ec3"];
@@ -550,13 +550,14 @@ const CARD_CSS = `
   .sub { font-size: 13px; color: var(--t-muted); }
   .rssi { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--t-muted); }
   .dial { position: relative; width: min(100%, 350px); aspect-ratio: 1; align-self: center; }
-  .dial svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
-  .dial svg.drag { cursor: pointer; }
+  .dial > svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .dial > svg.drag { cursor: pointer; }
   .center { position: absolute; left: 0; right: 0; top: 28%; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
   .cur { font-size: clamp(40px, 13vw, 64px); font-weight: 600; line-height: 1; }
   .cur span { font-size: 0.44em; color: var(--t-muted); }
   .tgt { font-size: clamp(20px, 6vw, 30px); font-weight: 600; color: var(--t-muted); }
   .pill { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 6px 12px; border-radius: 999px; font-size: 14px; font-weight: 500; }
+  .pill svg { width: 14px; height: 14px; flex-shrink: 0; }
   .pill.ok { background: var(--t-ok-bg); color: var(--t-ok-fg); }
   .pill.warm { background: var(--t-warm-bg); color: var(--t-warm-fg); }
   .pill.snow { background: var(--t-off-bg); color: var(--t-off-fg); }
