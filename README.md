@@ -26,6 +26,27 @@ Temperature setpoint is only used in manual (Performance) mode. In any other mod
 
 <img src="https://github.com/krasnoukhov/homeassistant-tesy/assets/944286/a08289f7-d7cc-49a0-9747-9fbd765e58d1" alt="heater" width="400">
 
+## Lovelace card
+
+The integration ships its own thermostat card, `custom:tesy-boiler-card`. It is served and loaded by the integration, so there is nothing else to install: after updating, restart Home Assistant and reload the browser.
+
+```yaml
+type: custom:tesy-boiler-card
+entity: water_heater.boiler_modeco_2_heater
+# optional
+name: Boiler
+subtitle: ModEco 2 · 100 L
+animation: false   # turn off the heating animation
+```
+
+- Dial with the current water temperature and the active target; the drag handle sets the manual setpoint (manual mode only).
+- Operation modes, Boost and power; a subtle animation while the element heats (off when the system asks for reduced motion).
+- **Schedule** dialog: P1-P3 as a 7×24 grid (landscape) or day by day (portrait / narrow screens), with a temperature brush (15-75 °C, or snowflake = heating off), copying a day to other days and writing through `tesy.set_schedule`.
+- **Statistics** dialog: energy, errors, Wi-Fi, uptime, firmware and clock status.
+- Follows the Home Assistant light/dark theme; Russian, Ukrainian and English.
+
+Related entities (Boost switch, energy and diagnostic sensors, clock sensor) are found automatically on the same device.
+
 ## Installation
 
 ### Via HACS
