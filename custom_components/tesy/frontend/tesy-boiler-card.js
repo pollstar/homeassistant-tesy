@@ -10,7 +10,7 @@
  *   entity: water_heater.boiler_modeco_2_heater
  */
 
-export const CARD_VERSION = "0.1.2";
+export const CARD_VERSION = "0.1.3";
 
 export const DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 export const MODES = ["performance", "p1", "p2", "p3", "eco", "ec2", "ec3"];
@@ -415,6 +415,9 @@ class TesyBoilerCard extends Base {
             ${rssi !== undefined && rssi !== "unavailable" ? `<div class="rssi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 8.5a15 15 0 0 1 20 0"></path><path d="M5.5 12a10 10 0 0 1 13 0"></path><path d="M9 15.5a5 5 0 0 1 6 0"></path><circle cx="12" cy="19" r="1"></circle></svg><span class="num">${esc(rssi)} dBm</span></div>` : ""}
           </div>
 
+          <div class="dialwrap">
+          <button type="button" class="power ${v.power ? "on" : ""}" aria-pressed="${v.power}" data-action="power"
+                  aria-label="${esc(s.power)}: ${esc(v.power ? s.powerOn : s.powerOff)}" title="${esc(s.power)}: ${esc(v.power ? s.powerOn : s.powerOff)}" ${v.available ? "" : "disabled"}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 2v10"></path><path d="M18.4 6.6a9 9 0 1 1-12.8 0"></path></svg></button>
           <div class="dial">
             <svg viewBox="0 0 280 280" role="slider" tabindex="${hasHandle ? 0 : -1}" aria-label="${esc(s.setpoint)}"
                  aria-valuemin="${MIN_TEMP}" aria-valuemax="${MAX_TEMP}" aria-valuenow="${hasHandle ? setpoint : ""}"
@@ -431,26 +434,21 @@ class TesyBoilerCard extends Base {
               <div class="pill ${status[0]}">${v.heating ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22c4 0 7-2.8 7-6.8 0-3.5-2.3-5.6-4-7.7-.6 2-1.6 3-3 3.5.4-3.4-1-6.5-4-9 0 4-4 6.5-4 12.2C4 19.2 7.6 22 12 22z">${animate ? `<animate attributeName="opacity" values="1;0.5;0.85;1" dur="1.6s" repeatCount="indefinite"></animate>` : ""}</path></svg>` : ""}<span>${esc(status[1])}</span></div>
             </div>
           </div>
+          </div>
 
           <div class="modes" role="group">
             ${MODES.filter((m) => (stateObj.attributes.operation_list || MODES).includes(m)).map((m) => `
               <button type="button" class="chip ${v.mode === m ? "on" : ""}" aria-pressed="${v.mode === m}" data-action="mode" data-mode="${m}" ${v.available ? "" : "disabled"}>${esc(s.modes[m])}</button>`).join("")}
           </div>
 
-          <div class="tiles">
-            ${this._ents.boost ? `<button type="button" class="tile ${boostOn ? "warm" : ""}" aria-pressed="${boostOn}" data-action="boost" ${v.available ? "" : "disabled"}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2.1-.1-2.9a2.2 2.2 0 0 0-2.9-.1z"></path><path d="M12 15l-3-3a22 22 0 0 1 2-3.9A12.9 12.9 0 0 1 22 2c0 2.7-.8 7.5-6 11a22.4 22.4 0 0 1-4 2z"></path></svg>
-              <span><b>${esc(s.boost)}</b><small>${esc(boostOn ? s.boostOn : s.boostOffHint)}</small></span></button>` : ""}
-            <button type="button" class="tile ${v.power ? "ok" : ""}" aria-pressed="${v.power}" data-action="power" ${v.available ? "" : "disabled"}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 2v10"></path><path d="M18.4 6.6a9 9 0 1 1-12.8 0"></path></svg>
-              <span><b>${esc(s.power)}</b><small>${esc(v.power ? s.powerOn : s.powerOff)}</small></span></button>
-          </div>
-
-          <div class="tiles">
-            <button type="button" class="link" data-action="schedule">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg><span>${esc(s.schedule)}</span></button>
-            <button type="button" class="link" data-action="stats">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"></path><path d="M7 15l4-4 3 3 5-6"></path></svg><span>${esc(s.stats)}</span></button>
+          <div class="actions">
+            ${this._ents.boost ? `<button type="button" class="act ${boostOn ? "warm" : ""}" aria-pressed="${boostOn}" data-action="boost"
+                aria-label="${esc(s.boost)}: ${esc(boostOn ? s.boostOn : s.boostOffHint)}" title="${esc(s.boost)}: ${esc(boostOn ? s.boostOn : s.boostOffHint)}" ${v.available ? "" : "disabled"}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2.1-.1-2.9a2.2 2.2 0 0 0-2.9-.1z"></path><path d="M12 15l-3-3a22 22 0 0 1 2-3.9A12.9 12.9 0 0 1 22 2c0 2.7-.8 7.5-6 11a22.4 22.4 0 0 1-4 2z"></path></svg></button>` : ""}
+            <button type="button" class="act" data-action="schedule" aria-label="${esc(s.schedule)}" title="${esc(s.schedule)}">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg></button>
+            <button type="button" class="act" data-action="stats" aria-label="${esc(s.stats)}" title="${esc(s.stats)}">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"></path><path d="M7 15l4-4 3 3 5-6"></path></svg></button>
           </div>
 
           ${clockBad ? `<div class="warn" role="status"><span>${esc(s.clockProblem)}</span>${this._ents.sync_timezone ? `<button type="button" data-action="sync">${esc(s.sync)}</button>` : ""}</div>` : ""}
@@ -578,13 +576,13 @@ const CARD_CSS = `
   .modes { display: flex; flex-wrap: wrap; gap: 10px; }
   .chip { min-height: 44px; padding: 0 16px; border-radius: 12px; font-size: 14px; font-weight: 500; background: var(--t-surface); border: 1px solid var(--t-border); color: var(--t-text); }
   .chip.on { background: var(--t-accent); border-color: var(--t-accent); color: var(--t-on-accent); }
-  .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .tile { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 0 16px; border-radius: 16px; text-align: left; background: var(--t-surface); border: 1px solid var(--t-border); }
-  .tile span { display: flex; flex-direction: column; gap: 2px; }
-  .tile b { font-size: 15px; } .tile small { font-size: 12px; opacity: .85; }
-  .tile.warm { background: var(--t-warm-bg); color: var(--t-warm-fg); border-color: var(--t-warm-border); }
-  .tile.ok { background: var(--t-ok-bg); color: var(--t-ok-fg); border-color: var(--t-ok-border); }
-  .link { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border-radius: 14px; background: var(--t-surface); border: 1px solid var(--t-border); font-size: 14px; font-weight: 500; }
+  .dialwrap { position: relative; display: flex; justify-content: center; }
+  .power { position: absolute; top: 0; right: 0; z-index: 1; width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+           background: var(--t-surface); border: 1px solid var(--t-border); color: var(--t-muted); }
+  .power.on { background: var(--t-ok-bg); border-color: var(--t-ok-border); color: var(--t-ok-fg); }
+  .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); grid-auto-flow: column; gap: 10px; }
+  .act { min-height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: var(--t-surface); border: 1px solid var(--t-border); }
+  .act.warm { background: var(--t-warm-bg); border-color: var(--t-warm-border); color: var(--t-warm-fg); }
   .warn { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--t-warm-bg); color: var(--t-warm-fg); font-size: 13px; }
   .warn span { flex: 1; }
   .warn button { min-height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--t-warm-border); background: transparent; font-weight: 600; }
