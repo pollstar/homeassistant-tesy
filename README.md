@@ -91,13 +91,13 @@ On devices that report weekly programs (`prgP1MO` … `prgP3SU`, e.g. ModEco 2 /
 
 | Attribute | Description |
 |-----------|-------------|
-| `schedule_p1` … `schedule_p3` | `{"mo": [24 values], …, "su": [...]}`, °C per hour from 00:00, `null` = empty hour (not stored in history) |
+| `schedule_p1` … `schedule_p3` | `{"mo": [24 values], …, "su": [...]}`, °C per hour from 00:00; `14` = heating off for that hour (snowflake in MyTESY), `null` = no program entry (not stored in history) |
 | `active_program` | `1`-`3` while a program runs, otherwise `null` |
 | `manual_temperature` | Setpoint kept for manual mode (`tmpT`) |
 
 While a program runs without Boost, the target temperature (entity and `Target Temperature` sensor) is taken from the program for the current hour of the device clock, because the firmware reports a placeholder (`9`) in `tmpR` in that case. With Boost on, `tmpR` holds the real target (75 °C) and is used as is.
 
-Programs can be written with the `tesy.set_schedule` action:
+Programs can be written with the `tesy.set_schedule` action. Use 15-75 °C for a setpoint and `14` to switch heating off for an hour:
 
 ```yaml
 action: tesy.set_schedule

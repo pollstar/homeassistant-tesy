@@ -21,9 +21,10 @@ PROGRAMS = (1, 2, 3)
 HOURS_PER_DAY = 24
 EMPTY_SLOT = 0xFF
 
-# Bounds accepted by the device for a scheduled hour (14 °C is used by the
-# factory programs as "keep cold").
-MIN_SLOT_TEMP = 14
+# Bounds accepted by the device for a scheduled hour. 14 °C means "heating off"
+# for that hour (MyTESY shows a snowflake); 15-75 °C are real setpoints.
+HEATING_OFF_TEMP = 14
+MIN_SLOT_TEMP = HEATING_OFF_TEMP
 MAX_SLOT_TEMP = 75
 
 # Mode values ("mode" field) that run a weekly program, mapped to the program.

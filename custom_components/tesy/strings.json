@@ -87,7 +87,7 @@
         },
         "temperatures": {
           "name": "Temperatures",
-          "description": "24 values, one per hour starting at 00:00, in °C (14-75). Use null for an empty hour."
+          "description": "24 values, one per hour starting at 00:00: 15-75 °C, or 14 to switch heating off for that hour. Use null for an hour with no program entry."
         }
       }
     }
