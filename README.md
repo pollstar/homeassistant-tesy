@@ -85,6 +85,32 @@ Custom icons are provided for Program 1-3 and Eco modes. Standard modes use core
 | `switch.boost` | Boost mode |
 | `switch.child_lock` | Child lock (if supported) |
 
+### Weekly programs
+
+On devices that report weekly programs (`prgP1MO` … `prgP3SU`, e.g. ModEco 2 / id 2004), the water heater entity gets extra attributes:
+
+| Attribute | Description |
+|-----------|-------------|
+| `schedule_p1` … `schedule_p3` | `{"mo": [24 values], …, "su": [...]}`, °C per hour from 00:00, `null` = empty hour (not stored in history) |
+| `active_program` | `1`-`3` while a program runs, otherwise `null` |
+| `manual_temperature` | Setpoint kept for manual mode (`tmpT`) |
+
+While a program runs, the target temperature (entity and `Target Temperature` sensor) is taken from the program for the current hour of the device clock, because the firmware reports a placeholder (`9`) in `tmpR` in those modes.
+
+Programs can be written with the `tesy.set_schedule` action:
+
+```yaml
+action: tesy.set_schedule
+target:
+  entity_id: water_heater.heater
+data:
+  program: 3
+  days: [mo, tu, we, th, fr]   # optional, all days if omitted
+  temperatures: [14, 14, 14, 14, 14, 14, 60, 60, 60, 14, 14, 14, 14, 14, 14, 14, 14, 14, 60, 60, 60, 60, 14, 14]
+```
+
+Each day is a 24-byte hex string on the device and is written with `/api?name=prgP3MO&set=<48 hex chars>`.
+
 ### Buttons
 
 | Entity | Description |
@@ -99,7 +125,9 @@ Custom icons are provided for Program 1-3 and Eco modes. Standard modes use core
 | `mode` | Operation mode | Water heater |
 | `tmpC` | Current temperature / showers | Temperature sensor |
 | `tmpT` | Target temperature setpoint | Water heater |
-| `tmpR` | Active target temperature | Target Temperature sensor |
+| `tmpR` | Active target temperature (placeholder `9` while a program runs) | Target Temperature sensor |
+| `date` | Device local time | Program target lookup |
+| `prgP{1-3}{MO..SU}` | Weekly programs, 24 bytes hex per day, °C per hour, `FF` = empty | Schedule attributes, `tesy.set_schedule` |
 | `ht` | Heating element active | `is_heating` attr |
 | `bst` | Boost flag | Boost switch |
 | `cdt` | Countdown timer (minutes) | Ready In sensor |

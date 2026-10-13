@@ -84,6 +84,14 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Set child lock for Tesy component."""
         return await self.hass.async_add_executor_job(self._client.set_child_lock, val)
 
+    async def async_set_schedule(self, key: str, val: str) -> dict[str, Any]:
+        """Write one day of a weekly program."""
+        if self.is_old_api:
+            raise NotImplementedError("Schedules are not supported by the old API")
+        return await self.hass.async_add_executor_job(
+            self._client.set_schedule, key, val
+        )
+
     async def async_reset_energy_counter(self) -> dict[str, Any]:
         """Reset the resettable energy counter."""
         return await self.hass.async_add_executor_job(self._client.reset_energy_counter)
