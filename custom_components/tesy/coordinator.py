@@ -41,6 +41,7 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._client = Tesy(data)
         self._posix_tz_cache: dict[str, str | None] = {}
         self._refresh_unsub = None
+        self._commands_in_flight = 0
 
         super().__init__(
             hass,
@@ -71,11 +72,25 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         The reply only echoes the written field; the heating state, active
         target, device time and the like follow on the next poll. Every command
         goes through here, so none of them waits for the regular poll.
+
+        A pending poll is cancelled before the command is sent and scheduled
+        again once no command is in flight, so a batch (a schedule written day
+        by day, however slowly) is read back once, after its last write.
         """
+        self._cancel_refresh()
+        self._commands_in_flight += 1
         try:
             return await self.hass.async_add_executor_job(func, *args)
         finally:
-            self.async_refresh_soon()
+            self._commands_in_flight -= 1
+            if not self._commands_in_flight:
+                self.async_refresh_soon()
+
+    @callback
+    def _cancel_refresh(self) -> None:
+        if self._refresh_unsub:
+            self._refresh_unsub()
+            self._refresh_unsub = None
 
     # Set target temperature in manual mode
     async def async_set_target_temperature(self, val: int) -> None:
@@ -115,8 +130,7 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         Several commands in a row (e.g. a schedule written day by day) lead to
         one poll after the last of them.
         """
-        if self._refresh_unsub:
-            self._refresh_unsub()
+        self._cancel_refresh()
 
         @callback
         def _run(_now) -> None:
