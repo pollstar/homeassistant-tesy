@@ -10,7 +10,7 @@
  *   entity: water_heater.boiler_modeco_2_heater
  */
 
-export const CARD_VERSION = "0.1.12";
+export const CARD_VERSION = "0.1.13";
 
 export const DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 export const MODES = ["performance", "p1", "p2", "p3", "eco", "ec2", "ec3"];
@@ -249,6 +249,20 @@ export function errorView(state) {
   const code = String(state).trim();
   if (/^0+$/.test(code)) return { kind: "ok", code: "00" };
   return { kind: "error", code: code.padStart(2, "0") };
+}
+
+/**
+ * The heater's wall clock from device_time ("2026-10-14T09:05:00", no zone):
+ * { day: 0 = Monday … 6, hour, minute }, or null. Read as plain fields, not
+ * through the browser's time zone, which would shift hours in its DST gap.
+ */
+export function wallClock(value) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(value || ""));
+  if (!m) return null;
+  const [y, mo, d, h, mi] = m.slice(1).map(Number);
+  const date = new Date(Date.UTC(y, mo - 1, d)); // UTC only as a container
+  if (date.getUTCMonth() !== mo - 1 || h > 23 || mi > 59) return null;
+  return { day: (date.getUTCDay() + 6) % 7, hour: h, minute: mi };
 }
 
 export function heaterView(stateObj, boostOn) {
@@ -570,9 +584,9 @@ class TesyBoilerCard extends Base {
 
     const clock = hass.states[this._ents.clock_problem];
     const clockBad = clock?.state === "on";
-    const devTime = clock?.attributes?.device_time ? new Date(clock.attributes.device_time) : null;
-    const clockText = devTime && !Number.isNaN(devTime.getTime())
-      ? `${s.days[(devTime.getDay() + 6) % 7]} ${String(devTime.getHours()).padStart(2, "0")}:${String(devTime.getMinutes()).padStart(2, "0")} · ${s.clock}`
+    const devTime = wallClock(clock?.attributes?.device_time);
+    const clockText = devTime
+      ? `${s.days[devTime.day]} ${String(devTime.hour).padStart(2, "0")}:${String(devTime.minute).padStart(2, "0")} · ${s.clock}`
       : "";
 
     const targetText = v.power
@@ -854,7 +868,7 @@ class TesyBoilerDialog extends Base {
     // The running program may be one that could not be read: then the first one.
     this._st.prog = original[active] ? Number(active) : Number(Object.keys(original)[0]);
     const dev = this._deviceNow();
-    this._st.day = dev ? DAYS[(dev.getDay() + 6) % 7] : "mo";
+    this._st.day = dev ? DAYS[dev.day] : "mo";
     this._st.copySrc = this._st.day;
   }
 
@@ -870,9 +884,7 @@ class TesyBoilerDialog extends Base {
   }
 
   _deviceNow() {
-    const t = this._hass.states[this._ents.clock_problem]?.attributes?.device_time;
-    const d = t ? new Date(t) : null;
-    return d && !Number.isNaN(d.getTime()) ? d : null;
+    return wallClock(this._hass.states[this._ents.clock_problem]?.attributes?.device_time);
   }
 
   _dirtyDays() {
@@ -976,7 +988,7 @@ class TesyBoilerDialog extends Base {
   _isNow(day, h) {
     const a = this._hass.states[this._config.entity]?.attributes || {};
     const now = this._deviceNow();
-    return now && a.active_program === this._st.prog && DAYS[(now.getDay() + 6) % 7] === day && now.getHours() === h;
+    return now && a.active_program === this._st.prog && DAYS[now.day] === day && now.hour === h;
   }
 
   _brushHtml(s, compact) {

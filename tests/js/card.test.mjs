@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   tempRole, angleFor, tempFromPoint, scheduleCalls, heaterView, deviceEntities, DAYS,
-  loadedVersion, staleAction, pickLang, cardSupported, markReloaded, errorView, numberLocale, versionCheckDue,
+  loadedVersion, staleAction, pickLang, cardSupported, markReloaded, errorView, numberLocale, versionCheckDue, wallClock,
 } from "../../custom_components/tesy/frontend/tesy-boiler-card.js";
 
 test("temperature roles", () => {
@@ -140,4 +140,12 @@ test("version is rechecked after a reconnect and every 10 minutes", () => {
   assert.equal(versionCheckDue(hass, { ...hass, connected: false }, t0, t0 + 1000), false); // offline now
   assert.equal(versionCheckDue(hass, hass, t0, t0 + 10 * 60 * 1000), true);
   assert.equal(versionCheckDue(undefined, {}, 0, t0), false); // no API
+});
+
+test("heater wall clock is read without the browser time zone", () => {
+  // 2026-03-08 02:30 does not exist in America/New_York; the heater shows it anyway.
+  assert.deepEqual(wallClock("2026-03-08T02:30:00"), { day: 6, hour: 2, minute: 30 }); // Sunday
+  assert.deepEqual(wallClock("2026-10-14T09:05:00"), { day: 2, hour: 9, minute: 5 }); // Wednesday
+  assert.deepEqual(wallClock("2026-10-14 23:59:59"), { day: 2, hour: 23, minute: 59 });
+  for (const bad of [undefined, null, "", "garbage", "2026-02-30T10:00:00", "2026-10-14T24:00:00"]) assert.equal(wallClock(bad), null);
 });
