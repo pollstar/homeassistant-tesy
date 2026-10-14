@@ -10,7 +10,7 @@
  *   entity: water_heater.boiler_modeco_2_heater
  */
 
-export const CARD_VERSION = "0.1.10";
+export const CARD_VERSION = "0.1.11";
 
 export const DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 export const MODES = ["performance", "p1", "p2", "p3", "eco", "ec2", "ec3"];
@@ -119,6 +119,16 @@ export function pickLang(language) {
 }
 
 const uiLanguage = (hass) => hass?.locale?.language || hass?.language;
+
+/** A locale Intl accepts for the HA UI language: "uk_UA" -> "uk-UA", else "en". */
+export function numberLocale(language) {
+  const tag = String(language || "").replace(/_/g, "-");
+  try {
+    return (tag && Intl.NumberFormat.supportedLocalesOf(tag)[0]) || "en";
+  } catch (e) {
+    return "en"; // not a valid BCP 47 tag
+  }
+}
 
 function strings(hass) {
   return STRINGS[pickLang(uiLanguage(hass))];
@@ -397,7 +407,7 @@ function formatTemp(t, s) {
 
 function formatCurrent(t, hass) {
   if (t === null || t === undefined || Number.isNaN(t)) return "—";
-  return new Intl.NumberFormat(uiLanguage(hass) || "en", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(t);
+  return new Intl.NumberFormat(numberLocale(uiLanguage(hass)), { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(t);
 }
 
 // ---------------------------------------------------------------- the card
@@ -639,6 +649,7 @@ class TesyBoilerCard extends Base {
 
   async _commit(t) {
     if (t === undefined || t === null) return;
+    const seq = (this._commitSeq = (this._commitSeq || 0) + 1);
     this._pendingTarget = t;
     const now = Date.now();
     this._optimistic = { target: t, since: now, until: now + 15000 };
@@ -647,8 +658,9 @@ class TesyBoilerCard extends Base {
     clearTimeout(this._pendingTimer);
     this._pendingTimer = setTimeout(() => { this._pendingTarget = undefined; this._render(); }, 8000);
     const ok = await this._call("water_heater", "set_temperature", { entity_id: this._config.entity, temperature: t });
-    if (!ok) {
-      // Do not keep showing a setpoint and heating state the heater never got.
+    if (!ok && seq === this._commitSeq) {
+      // Do not keep showing a setpoint and heating state the heater never got
+      // (unless a newer setpoint was sent since: that one is still on its way).
       this._optimistic = null;
       this._pendingTarget = undefined;
       clearTimeout(this._optimisticTimer);
@@ -809,7 +821,8 @@ class TesyBoilerDialog extends Base {
     this._original = original;
     this._edit = JSON.parse(JSON.stringify(original));
     const active = a.active_program;
-    this._st.prog = active || 1;
+    // The running program may be one that could not be read: then the first one.
+    this._st.prog = original[active] ? Number(active) : Number(Object.keys(original)[0]);
     const dev = this._deviceNow();
     this._st.day = dev ? DAYS[(dev.getDay() + 6) % 7] : "mo";
     this._st.copySrc = this._st.day;
@@ -892,7 +905,7 @@ class TesyBoilerDialog extends Base {
       const o = st(id);
       if (!o || o.state === "unavailable" || o.state === "unknown") return "—";
       const n = Number(o.state);
-      return Number.isNaN(n) ? o.state : new Intl.NumberFormat(uiLanguage(this._hass) || "en", { maximumFractionDigits: digits }).format(n);
+      return Number.isNaN(n) ? o.state : new Intl.NumberFormat(numberLocale(uiLanguage(this._hass)), { maximumFractionDigits: digits }).format(n);
     };
     const err = errorView(st(this._ents.error_status)?.state);
     const errPill = {

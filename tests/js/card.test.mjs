@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   tempRole, angleFor, tempFromPoint, scheduleCalls, heaterView, deviceEntities, DAYS,
-  loadedVersion, staleAction, pickLang, cardSupported, markReloaded, errorView,
+  loadedVersion, staleAction, pickLang, cardSupported, markReloaded, errorView, numberLocale,
 } from "../../custom_components/tesy/frontend/tesy-boiler-card.js";
 
 test("temperature roles", () => {
@@ -121,4 +121,12 @@ test("error sensor: no data is not a fault", () => {
   assert.deepEqual(errorView("0"), { kind: "ok", code: "00" });
   assert.deepEqual(errorView("03"), { kind: "error", code: "03" });
   assert.deepEqual(errorView("3"), { kind: "error", code: "03" });
+});
+
+test("number locale accepts HA language codes", () => {
+  assert.equal(numberLocale("uk_UA"), "uk-UA");
+  assert.equal(numberLocale("ru"), "ru");
+  assert.equal(numberLocale("en-GB"), "en-GB");
+  for (const bad of [undefined, "", "not a locale!", "x_"]) assert.equal(numberLocale(bad), "en");
+  assert.doesNotThrow(() => new Intl.NumberFormat(numberLocale("uk_UA")).format(42.5));
 });
