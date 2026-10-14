@@ -319,7 +319,9 @@ class TesyTargetTempSensor(TesySensor):
     @property
     def native_value(self):
         """Return the current target temperature."""
-        return active_target(self.coordinator.data)
+        return active_target(
+            self.coordinator.data, use_schedule=self.coordinator.supports_schedule
+        )
 
 
 class TesyErrorSensor(TesySensor):

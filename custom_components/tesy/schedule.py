@@ -129,17 +129,20 @@ def active_program(data: dict[str, Any]) -> int | None:
     return PROGRAM_MODES.get(str(data.get("mode")))
 
 
-def active_target(data: dict[str, Any], now: datetime | None = None) -> float | None:
+def active_target(
+    data: dict[str, Any], now: datetime | None = None, use_schedule: bool = True
+) -> float | None:
     """Return the target the device is working towards right now.
 
     ``tmpR`` holds it in manual and Eco modes and while Boost is active. While a
     weekly program runs without Boost, the ModEco 2 (id 2004) firmware reports a
     placeholder there (``9``), so the value is taken from the program for the
-    current hour instead.
+    current hour instead. With use_schedule False (models without verified
+    program support) ``tmpR`` is returned as is.
     """
     program = active_program(data)
     boost = str(data.get("bst")) == "1"
-    if program is not None and not boost and has_schedules(data):
+    if program is not None and not boost and use_schedule and has_schedules(data):
         target = scheduled_target(data, program, now)
         return None if target is None else float(target)
 

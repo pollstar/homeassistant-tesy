@@ -53,7 +53,6 @@ from .schedule import (
     active_target,
     encode_day,
     get_program,
-    has_schedules,
     schedule_key,
 )
 
@@ -102,7 +101,7 @@ async def async_setup_entry(
     """Create Tesy water heater in HASS."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
 
-    if not coordinator.is_old_api and has_schedules(coordinator.data):
+    if coordinator.supports_schedule:
         platform = entity_platform.async_get_current_platform()
         platform.async_register_entity_service(
             SERVICE_SET_SCHEDULE,
@@ -130,7 +129,9 @@ class TesyWaterHeater(TesyEntity, WaterHeaterEntity):
 
     _attr_operation_list = OPERATION_LIST
     # Weekly programs are a few KB and change rarely; keep them out of history.
-    _unrecorded_attributes = frozenset({f"schedule_p{program}" for program in PROGRAMS})
+    _unrecorded_attributes = frozenset(
+        {f"schedule_p{program}" for program in PROGRAMS} | {"tesy_features"}
+    )
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_precision = PRECISION_WHOLE
     _attr_supported_features = (
@@ -299,7 +300,9 @@ class TesyWaterHeater(TesyEntity, WaterHeaterEntity):
     @property
     def target_temperature(self):
         """Return the target the heater is currently working towards."""
-        return active_target(self.coordinator.data)
+        return active_target(
+            self.coordinator.data, use_schedule=self.coordinator.supports_schedule
+        )
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -310,7 +313,12 @@ class TesyWaterHeater(TesyEntity, WaterHeaterEntity):
             "target_temp_step": 1,
         }
 
-        if has_schedules(data):
+        features = self.coordinator.features
+        if features:
+            # Lets the card tell a supported heater from one with basic control.
+            attributes["tesy_features"] = sorted(features)
+
+        if self.coordinator.supports_schedule:
             # Setpoint used in manual mode, kept while another mode is active.
             if ATTR_TARGET_TEMP in data:
                 attributes["manual_temperature"] = int(data[ATTR_TARGET_TEMP])
@@ -324,6 +332,11 @@ class TesyWaterHeater(TesyEntity, WaterHeaterEntity):
         self, program: int, temperatures: list[int | None], days: list[str]
     ) -> None:
         """Write 24 hourly temperatures (None = empty hour) to program days."""
+        if not self.coordinator.supports_schedule:
+            # The service is per platform; another Tesy heater may support it.
+            raise ServiceValidationError(
+                f"Weekly programs are not supported on {self.entity_id}"
+            )
         try:
             value = encode_day(temperatures)
         except ValueError as err:

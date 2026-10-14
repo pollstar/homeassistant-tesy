@@ -101,6 +101,11 @@ class ActiveTargetTest(TestCase):
         # Old API data has no prg fields; keep the previous behaviour.
         self.assertEqual(schedule.active_target({"mode": "1", "tmpR": "55"}), 55.0)
 
+    def test_unverified_model_keeps_tmp_r(self):
+        # Programs reported, but not enabled for the model: basic behaviour.
+        data = device_data(mode="1", tmp_r="9")
+        self.assertEqual(schedule.active_target(data, use_schedule=False), 9.0)
+
     def test_unknown_clock_is_unknown(self):
         data = device_data(mode="1", date="garbage")
         self.assertIsNone(schedule.active_target(data))

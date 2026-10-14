@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .features import FEATURE_CARD, FEATURE_SCHEDULE, FEATURE_TIMEZONE, device_features
 from .tesy import Tesy
 from .timezone import TZ_FIELD, posix_tz_for
 from .tesy_oldapi import TesyOldApi
@@ -120,9 +121,26 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._refresh_unsub = async_call_later(self.hass, delay, _run)
 
     @property
+    def features(self) -> frozenset[str]:
+        """Extended features enabled for this heater model (see features.py)."""
+        if self.is_old_api:
+            return frozenset()
+        return device_features(self.data)
+
+    @property
+    def supports_schedule(self) -> bool:
+        """Return True if weekly programs are enabled for this heater."""
+        return FEATURE_SCHEDULE in self.features
+
+    @property
     def supports_timezone(self) -> bool:
-        """Return True if the device exposes a writable POSIX time zone."""
-        return not self.is_old_api and TZ_FIELD in (self.data or {})
+        """Return True if time zone sync is enabled for this heater."""
+        return FEATURE_TIMEZONE in self.features
+
+    @property
+    def supports_card(self) -> bool:
+        """Return True if the thermostat card supports this heater."""
+        return FEATURE_CARD in self.features
 
     @property
     def expected_timezone(self) -> str | None:

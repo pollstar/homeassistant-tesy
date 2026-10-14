@@ -10,7 +10,7 @@
  *   entity: water_heater.boiler_modeco_2_heater
  */
 
-export const CARD_VERSION = "0.1.6";
+export const CARD_VERSION = "0.1.7";
 
 export const DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 export const MODES = ["performance", "p1", "p2", "p3", "eco", "ec2", "ec3"];
@@ -48,6 +48,7 @@ const STRINGS = {
     firmware: "Прошивка", clockRow: "Часы", ok: "в порядке", codes: "Коды ошибок",
     e01: "обрыв нижнего датчика", e02: "КЗ нижнего датчика", e03: "обрыв верхнего датчика", e04: "КЗ верхнего датчика",
     h: "ч", min: "мин", kwh: "кВт·ч", noEntity: "Сущность не найдена",
+    unsupported: "Эта карточка пока поддерживает только проверенные модели (ModEco 2). Для этого бойлера используйте стандартную карточку термостата.",
     stale: "Карточка обновлена — перезагрузите страницу", reload: "Обновить",
   },
   uk: {
@@ -75,6 +76,7 @@ const STRINGS = {
     firmware: "Прошивка", clockRow: "Годинник", ok: "в порядку", codes: "Коди помилок",
     e01: "обрив нижнього датчика", e02: "КЗ нижнього датчика", e03: "обрив верхнього датчика", e04: "КЗ верхнього датчика",
     h: "год", min: "хв", kwh: "кВт·год", noEntity: "Сутність не знайдено",
+    unsupported: "Ця картка поки підтримує лише перевірені моделі (ModEco 2). Для цього бойлера використовуйте стандартну картку термостата.",
     stale: "Картку оновлено — перезавантажте сторінку", reload: "Оновити",
   },
   en: {
@@ -102,6 +104,7 @@ const STRINGS = {
     firmware: "Firmware", clockRow: "Clock", ok: "OK", codes: "Error codes",
     e01: "lower sensor open", e02: "lower sensor short", e03: "upper sensor open", e04: "upper sensor short",
     h: "h", min: "min", kwh: "kWh", noEntity: "Entity not found",
+    unsupported: "This card supports verified models only (ModEco 2 so far). Use the standard thermostat card for this heater.",
     stale: "The card was updated — reload the page", reload: "Reload",
   },
 };
@@ -211,6 +214,17 @@ export function deviceEntities(hass, entityId) {
 }
 
 /** What the card shows for a water heater state. */
+// The integration enables the card per heater model and lists it in the
+// tesy_features attribute. Returns null while that cannot be told (the heater
+// is unavailable and reports no attributes).
+export function cardSupported(stateObj) {
+  if (!stateObj) return null;
+  const features = stateObj.attributes?.tesy_features;
+  if (Array.isArray(features)) return features.includes("card");
+  if (stateObj.state === "unavailable" || stateObj.state === "unknown") return null;
+  return false;
+}
+
 export function heaterView(stateObj, boostOn) {
   const a = stateObj?.attributes || {};
   const available = !!stateObj && stateObj.state !== "unavailable" && stateObj.state !== "unknown";
@@ -348,9 +362,10 @@ const Base = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
 class TesyBoilerCard extends Base {
   static getStubConfig(hass) {
-    const entity = Object.keys(hass?.entities || {}).find(
+    const tesy = Object.keys(hass?.entities || {}).filter(
       (id) => id.startsWith("water_heater.") && hass.entities[id].platform === "tesy"
     );
+    const entity = tesy.find((id) => cardSupported(hass.states?.[id])) || tesy[0];
     return { entity: entity || "" };
   }
 
@@ -412,6 +427,11 @@ class TesyBoilerCard extends Base {
 
     if (!stateObj) {
       this.shadowRoot.innerHTML = `<style>${PALETTE}</style><ha-card><div style="padding:16px">${esc(s.noEntity)}: ${esc(this._config.entity)}</div></ha-card>`;
+      return;
+    }
+    if (cardSupported(stateObj) === false) {
+      const model = this._ents.device?.model;
+      this.shadowRoot.innerHTML = `<style>${PALETTE}</style><ha-card><div style="padding:16px">${esc(s.unsupported)}${model ? ` (${esc(model)})` : ""}</div></ha-card>`;
       return;
     }
 

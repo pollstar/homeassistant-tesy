@@ -31,12 +31,15 @@ PLATFORMS: list[Platform] = [
 _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+CARD_DATA = f"{DOMAIN}_card"
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Serve the tesy-boiler-card and load it in the frontend.
+    """Serve the tesy-boiler-card.
 
     The Lovelace card ships with the integration: no separate install needed.
+    It is added to the frontend once a heater model that supports it is set
+    up (see _async_load_card).
     """
     if hass.http is None:
         return True
@@ -44,10 +47,20 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     version = card_hash(content)
     hass.http.register_view(TesyCardView())
     hass.http.register_view(TesyCardVersionView(version))
+    hass.data[CARD_DATA] = {"version": version, "loaded": False}
+    return True
+
+
+@callback
+def _async_load_card(hass: HomeAssistant) -> None:
+    """Add the card to the frontend, once."""
+    card = hass.data.get(CARD_DATA)
+    if card is None or card["loaded"]:
+        return
     # The version changes with the file, so pages opened after an update load
     # the new card; the card itself reloads pages opened before the update.
-    add_extra_js_url(hass, f"{CARD_URL}?v={version}")
-    return True
+    add_extra_js_url(hass, f"{CARD_URL}?v={card['version']}")
+    card["loaded"] = True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -71,6 +84,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await coordinator.async_expected_timezone()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    if coordinator.supports_card:
+        _async_load_card(hass)
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
     if coordinator.supports_timezone:

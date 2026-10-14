@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   tempRole, angleFor, tempFromPoint, scheduleCalls, heaterView, deviceEntities, DAYS,
-  loadedVersion, staleAction, pickLang,
+  loadedVersion, staleAction, pickLang, cardSupported,
 } from "../../custom_components/tesy/frontend/tesy-boiler-card.js";
 
 test("temperature roles", () => {
@@ -94,4 +94,12 @@ test("card language follows the HA UI language, English otherwise", () => {
   assert.equal(pickLang("zh-Hans"), "en");
   assert.equal(pickLang(undefined), "en");
   assert.equal(pickLang("constructor"), "en");
+});
+
+test("card support follows the tesy_features attribute", () => {
+  assert.equal(cardSupported({ state: "performance", attributes: { tesy_features: ["card", "schedule"] } }), true);
+  assert.equal(cardSupported({ state: "performance", attributes: { tesy_features: ["schedule"] } }), false);
+  assert.equal(cardSupported({ state: "performance", attributes: {} }), false);
+  assert.equal(cardSupported({ state: "unavailable", attributes: {} }), null);
+  assert.equal(cardSupported(undefined), null);
 });

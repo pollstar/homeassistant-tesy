@@ -7,7 +7,7 @@ This fork by [Pavel Starovoitov (@pollstar)](https://github.com/pollstar) builds
 - **Weekly programs P1–P3**: read and write them from Home Assistant (`tesy.set_schedule`), with the correct target temperature while a program runs.
 - **Thermostat card** `custom:tesy-boiler-card`, shipped with the integration: setpoint dial, modes, Boost, power, schedule editor and diagnostics.
 - **Clock and time zone sync** with Home Assistant, so programs switch at the right hour.
-- **Configurable poll interval** and an immediate re-read after every command, so changes made on the heater panel or in MyTESY show up quickly.
+- **Configurable poll interval** and an immediate re-read after every command, so changes made on the heater panel or in MyTESY show up quickly. This part works on every model.
 
 <img src="https://raw.githubusercontent.com/pollstar/homeassistant-tesy/modeco2-weekly-programs/docs/card.png" alt="Tesy boiler card, dark and light theme" width="720">
 
@@ -15,19 +15,21 @@ This fork by [Pavel Starovoitov (@pollstar)](https://github.com/pollstar) builds
 
 Water heaters with the ESP32 Wi-Fi module (black PCB) and its local API at `http://<heater-ip>/api`. Older devices with an Atheros AR9331 module use a different API; enable *Use old API* in the setup dialog for them (basic control only), or replace the module with the ESP32 one.
 
-| ID | Model | Range |
-|----|-------|-------|
-| 2000 | ModEco | 15–75 °C |
-| 2002 | BelliSlimo | 0–4 showers |
-| 2003 | BiLight Smart | 15–75 °C |
-| 2004 | ModEco 2 | 15–75 °C |
-| 2005 | BelliSlimo Lite | 0–4 showers |
+| ID | Model | Range | Extended features |
+|----|-------|-------|-------------------|
+| 2000 | ModEco | 15–75 °C | — |
+| 2002 | BelliSlimo | 0–4 showers | — |
+| 2003 | BiLight Smart | 15–75 °C | — |
+| 2004 | ModEco 2 | 15–75 °C | weekly programs, time zone sync, card |
+| 2005 | BelliSlimo Lite | 0–4 showers | — |
 
-The features added in this fork (weekly programs, card, time zone sync, poll options) are tested only with:
+**Extended features are enabled per model.** The integration reads the model id (`id`) from the heater; weekly programs, time zone sync and the thermostat card are switched on only for models where they were verified, and only if the heater reports the fields they need. Every other model keeps the basic behaviour of the original integration: power, modes, setpoint, Boost, sensors. The list lives in [`features.py`](custom_components/tesy/features.py); a model is added there once it has been tested.
+
+The extended features are tested only with:
 
 - Tesy ModEco Cloud GCV 100 47 24D C22 ECW (ModEco 2, id 2004, firmware 200407 / Wi-Fi 0.29)
 
-Other models may differ in the fields they report; reports from owners of other models are welcome in [issues](https://github.com/pollstar/homeassistant-tesy/issues).
+If you own another model and want to help verify it, open an [issue](https://github.com/pollstar/homeassistant-tesy/issues) with the output of `http://<heater-ip>/api?name=_all` (remove the e-mail and SSID).
 
 The original integration (basic control) was reported working by its authors and users with:
 
@@ -62,7 +64,7 @@ After every command sent from Home Assistant the heater is read again about 2 s 
 
 ## Thermostat card
 
-The card is served and loaded by the integration — nothing else to install. After installing or updating the integration, restart Home Assistant and reload the browser once (Ctrl+F5; in the companion app: Settings → Debugging → Clear frontend cache).
+The card is served and loaded by the integration — nothing else to install. It is loaded once a supported heater (see *Extended features* above) is set up; on another model it shows a notice instead of the controls. After installing or updating the integration, restart Home Assistant and reload the browser once (Ctrl+F5; in the companion app: Settings → Debugging → Clear frontend cache).
 
 Add it from **Add card → Tesy boiler**, or with YAML:
 
@@ -129,13 +131,14 @@ The chart button opens energy and diagnostics.
 
 Setting a temperature switches the heater to Manual. The target shown is the one the heater works to now: the manual setpoint, the program value for the current hour, the Eco target, or 75 °C while Boost is on.
 
-Attributes: `is_heating`, and on devices with weekly programs:
+Attributes: `is_heating`, and on models with extended features:
 
 | Attribute | Description |
 |-----------|-------------|
 | `schedule_p1` … `schedule_p3` | `{"mo": [24 values], …, "su": [...]}`: °C per hour from 00:00; `14` = heating off for that hour (❄ in MyTESY), `null` = no entry. Not stored in history. |
 | `active_program` | `1`–`3` while a program runs, otherwise `null` |
 | `manual_temperature` | Setpoint kept for manual mode |
+| `tesy_features` | Extended features enabled for this heater, e.g. `["card", "schedule", "timezone"]`. Not stored in history. |
 
 ### Sensors
 
