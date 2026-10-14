@@ -1,38 +1,63 @@
 # Home Assistant Tesy integration
 
-This unofficial Tesy integration allows you to control smart wifi devices based on external esp32 wifi module (black pcb).
-It won't work if you have older device based on Atheros AR9331 chipset since the local API is different. In this case the module could be replaced with esp32 replacement module as they are compatible with most of Tesy water heaters, even if not comming with WiFi from the factory.
+Local control of Tesy Wi-Fi water heaters (ESP32 module, "Cloud" series) from Home Assistant — no cloud, no MyTESY account needed — plus a ready-made thermostat card.
+
+This fork by [Pavel Starovoitov (@pollstar)](https://github.com/pollstar) builds on the integration by [@krasnoukhov](https://github.com/krasnoukhov) and [@artin961](https://github.com/artin961) and adds:
+
+- **Weekly programs P1–P3**: read and write them from Home Assistant (`tesy.set_schedule`), with the correct target temperature while a program runs.
+- **Thermostat card** `custom:tesy-boiler-card`, shipped with the integration: setpoint dial, modes, Boost, power, schedule editor and diagnostics.
+- **Clock and time zone sync** with Home Assistant, so programs switch at the right hour.
+- **Configurable poll interval** and an immediate re-read after every command, so changes made on the heater panel or in MyTESY show up quickly.
+
+## Supported devices
+
+Water heaters with the ESP32 Wi-Fi module (black PCB) and its local API at `http://<heater-ip>/api`. Older devices with an Atheros AR9331 module use a different API; enable *Use old API* in the setup dialog for them (basic control only), or replace the module with the ESP32 one.
+
+| ID | Model | Range |
+|----|-------|-------|
+| 2000 | ModEco | 15–75 °C |
+| 2002 | BelliSlimo | 0–4 showers |
+| 2003 | BiLight Smart | 15–75 °C |
+| 2004 | ModEco 2 | 15–75 °C |
+| 2005 | BelliSlimo Lite | 0–4 showers |
 
 Tested with:
 
-- [Tesy Modeco Cloud GCV 150 47 24D C22 ECW](https://tesy.com/products/electric-water-heaters/modeco-series/modeco-cloud/?product=gcv-1504724d-c22-ecw)
-- BilightSmart
-- BelliSlimo
+- Tesy ModEco Cloud GCV 100 47 24D C22 ECW (ModEco 2, id 2004, firmware 200407 / Wi-Fi 0.29) — weekly programs, card, time zone sync
+- [Tesy ModEco Cloud GCV 150 47 24D C22 ECW](https://tesy.com/products/electric-water-heaters/modeco-series/modeco-cloud/?product=gcv-1504724d-c22-ecw)
+- BiLight Smart, BelliSlimo
 - [Tesy BelliSlimo Cloud GCR 80 27 22 E31 ECW](https://tesy.com/products/electric-water-heaters/bellislimo-series/bellislimo-cloud/?product=gcr-80-27-22-e31-ecw)
 
-## Highlights
+## Installation
 
-This integration allows you to change modes of the water heater as well as controlling the temperature setpoint in manual mode (defined as Performance in HA).
+### HACS (custom repository)
 
-Energy counter is also working. It uses long term counter from the device that counts the seconds the heater was on. In order for this to work properly you need to enter your heater power rating in the setup dialog. This information could be found on the device's label. For double tank devices this is read from the device and leaving it as zero is recommended.
+1. HACS → ⋮ → **Custom repositories** → `https://github.com/pollstar/homeassistant-tesy`, category **Integration**.
+2. Find **Tesy** in HACS → **Download**.
+3. Restart Home Assistant.
+4. **Settings → Devices & services → Add integration → Tesy**: enter the heater's IP address and the heater power from its label (e.g. 2400 W). Give the heater a fixed IP on your router.
 
-The integration provides two energy sensors: `Energy Consumed` tracks total lifetime usage. `Energy Consumed (Resettable)` uses the device's built-in resettable counter - a `Reset Consumed Energy` button is provided to reset it, like a trip odometer.
+If the original Tesy integration was installed from HACS, remove it from HACS first; the configured device and its entities stay, since both use the `tesy` domain.
 
-This integration exposes boost mode of the heaters as a switch. It can be switched on and off, but in order to work the heater should on.
+### Manual
 
-Child lock switch prevents accidental changes (if supported by the device).
+Copy `custom_components/tesy/` to `<config>/custom_components/` and restart Home Assistant.
 
-Temperature setpoint is only used in manual (Performance) mode. In any other modes it is ignored. If setpoint is manually changed operation mode will jump to performance in case the heater is powered on.
+## Options
 
-<img src="https://github.com/krasnoukhov/homeassistant-tesy/assets/944286/a08289f7-d7cc-49a0-9747-9fbd765e58d1" alt="heater" width="400">
+**Settings → Devices & services → Tesy → Configure**
 
-## Poll interval
+| Option | Default | Description |
+|--------|---------|-------------|
+| Poll interval | 30 s | How often the heater is read (5–300 s). Changes made on the heater panel or in MyTESY reach Home Assistant within this time; 10 s is a good value for a local device. |
 
-The heater is read every 30 seconds by default, so changes made on its panel or in the MyTESY app show up in Home Assistant (and on the card) within that time. To make it faster, open the integration → **Configure** and set **Poll interval** (5-300 s); 10 s is a good value for a local device. After any command from Home Assistant the heater is also read again ~2 s later.
+After every command sent from Home Assistant the heater is read again about 2 s later, so the heating state and target follow right away.
 
-## Lovelace card
+## Thermostat card
 
-The integration ships its own thermostat card, `custom:tesy-boiler-card`. It is served and loaded by the integration, so there is nothing else to install: after updating, restart Home Assistant and reload the browser.
+The card is served and loaded by the integration — nothing else to install. After installing or updating the integration, restart Home Assistant and reload the browser once (Ctrl+F5; in the companion app: Settings → Debugging → Clear frontend cache).
+
+Add it from **Add card → Tesy boiler**, or with YAML:
 
 ```yaml
 type: custom:tesy-boiler-card
@@ -40,173 +65,126 @@ entity: water_heater.boiler_modeco_2_heater
 # optional
 name: Boiler
 subtitle: ModEco 2 · 100 L
-animation: always  # auto (default: off when the system asks for reduced motion) | always | off
-auto_reload: false # do not reload an outdated page by itself, only show a banner
+animation: auto     # auto (off when the system asks for reduced motion) | always | off
+auto_reload: true   # reload a page that still runs an older card after an update
 ```
 
-- Dial with the current water temperature and the active target; the drag handle sets the manual setpoint (manual mode only).
-- Operation modes, Boost and power; a subtle animation while the element heats (by default off when the system asks for reduced motion; `animation: always` forces it).
-- After a setpoint change the heating status is shown right away and confirmed by a poll of the heater ~2 s after every command.
-- **Schedule** dialog: P1-P3 as a 7×24 grid (landscape) or day by day (portrait / narrow screens), with a temperature brush (15-75 °C, or snowflake = heating off), copying a day to other days and writing through `tesy.set_schedule`.
-- **Statistics** dialog: energy, errors, Wi-Fi, uptime, firmware and clock status.
-- Follows the Home Assistant light/dark theme; Russian, Ukrainian and English.
+- **Dial** with the current water temperature and the active target. In manual mode a handle on the dial sets the setpoint (15–75 °C); other modes show the target they work to.
+- **Power** button at the top right of the dial; **modes** Manual, P1–P3, Eco Smart/Comfort/Night; **Boost**, **schedule** and **statistics** as icon buttons.
+- Heating status (heating / target reached / heating off / off) with a subtle animation while the element heats.
+- **Schedule** dialog: P1–P3 as a 7×24 grid on wide screens, day by day on phones and portrait screens. Paint hours with a 15–75 °C brush or ❄ (heating off), copy a day to other days, then write to the heater. The dialog follows changes made elsewhere while nothing is edited.
+- **Statistics** dialog: energy, errors, Wi-Fi, uptime, firmware, clock state.
+- Follows the Home Assistant light/dark theme; English, Russian and Ukrainian.
 
-Related entities (Boost switch, energy and diagnostic sensors, clock sensor) are found automatically on the same device.
+Related entities (Boost switch, energy and diagnostic sensors, clock sensor, time zone button) are found automatically on the same device.
 
-**Updates and caching.** The card is served with `Cache-Control: no-cache` and an ETag, so browsers and reverse proxies (Cloudflare, nginx) check for a newer file on every page load. A page that was opened before Home Assistant restarted with a new card (e.g. a wall tablet) notices it and reloads itself once; if that does not help, the card shows a "reload" banner. A page that never loaded the card at all still needs one manual reload (Ctrl+F5, or "Clear frontend cache" in the companion app).
-
-## Installation
-
-### Via HACS
-
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=krasnoukhov&repository=homeassistant-tesy&category=Integration)
-
-* Search for "Tesy" on HACS tab in Home Assistant
-* Click on three dots and use the "Download" option
-* Follow the steps
-* Restart Home Assistant
-
-### Manual Installation (not recommended)
-
-* Copy the entire `custom_components/tesy/` directory to your server's `<config>/custom_components` directory
-* Restart Home Assistant
+**Updates and caching.** The card is served with `Cache-Control: no-cache` and an ETag, so browsers and reverse proxies (Cloudflare, nginx) check for a newer file on every page load. A page opened before Home Assistant restarted with a new card (a wall tablet, say) reloads itself once; if that does not help, the card shows a reload banner. A page that never loaded the card needs one manual reload.
 
 ## Entities
 
-### Water Heater
+### Water heater
 
-| Entity | Attributes |
-|--------|------------|
-| `water_heater.heater` | `is_heating`, `target_temp_step` |
+`water_heater.<name>_heater` — current temperature, target temperature and operation mode.
 
-### Operation Modes
+| Mode | Device `mode` | Description |
+|------|---------------|-------------|
+| Off | — | Heater powered off (frost protection stays active) |
+| Manual (`performance`) | 0 | Heats to the manual setpoint |
+| Program 1–3 (`p1`–`p3`) | 1–3 | Weekly program |
+| Eco Smart / Eco Comfort / Eco Night (`eco`, `ec2`, `ec3`) | 4–6 | Self-learning modes; the heater picks the target |
 
-| Mode | Description |
-|------|-------------|
-| Off | Heater is powered off |
-| Manual | Direct temperature control (default) |
-| Program 1 | Schedule-based heating preset 1 |
-| Program 2 | Schedule-based heating preset 2 |
-| Program 3 | Schedule-based heating preset 3 |
-| Eco Smart | Energy-saving mode |
-| Eco Comfort | Balanced comfort and efficiency |
-| Eco Night | Overnight energy-saving mode |
+Setting a temperature switches the heater to Manual. The target shown is the one the heater works to now: the manual setpoint, the program value for the current hour, the Eco target, or 75 °C while Boost is on.
 
-Custom icons are provided for Program 1-3 and Eco modes. Standard modes use core HA icons.
-
-### Sensors
-
-| Entity | Description | Device Class | Unit |
-|--------|-------------|-------------|------|
-| `sensor.temperature` | Current temperature / showers | `temperature` | °C |
-| `sensor.energy_consumed` | Total energy consumed | `energy` | kWh |
-| `sensor.ready_in` | Minutes until target is reached | `duration` | min |
-| `sensor.target_temperature` | Active target temperature | `temperature` | °C |
-| `sensor.error_status` | Error code (`00` = no error) | - | - |
-| `sensor.wifi_signal` | WiFi signal strength | `signal_strength` | dBm |
-| `sensor.uptime` | Device uptime | `duration` | s |
-| `sensor.energy_consumed_resettable` | Energy consumed (since last reset from device) | `energy` | kWh |
-
-### Switches
-
-| Entity | Description |
-|--------|-------------|
-| `switch.boost` | Boost mode |
-| `switch.child_lock` | Child lock (if supported) |
-
-### Weekly programs
-
-On devices that report weekly programs (`prgP1MO` … `prgP3SU`, e.g. ModEco 2 / id 2004), the water heater entity gets extra attributes:
+Attributes: `is_heating`, and on devices with weekly programs:
 
 | Attribute | Description |
 |-----------|-------------|
-| `schedule_p1` … `schedule_p3` | `{"mo": [24 values], …, "su": [...]}`, °C per hour from 00:00; `14` = heating off for that hour (snowflake in MyTESY), `null` = no program entry (not stored in history) |
-| `active_program` | `1`-`3` while a program runs, otherwise `null` |
-| `manual_temperature` | Setpoint kept for manual mode (`tmpT`) |
+| `schedule_p1` … `schedule_p3` | `{"mo": [24 values], …, "su": [...]}`: °C per hour from 00:00; `14` = heating off for that hour (❄ in MyTESY), `null` = no entry. Not stored in history. |
+| `active_program` | `1`–`3` while a program runs, otherwise `null` |
+| `manual_temperature` | Setpoint kept for manual mode |
 
-While a program runs without Boost, the target temperature (entity and `Target Temperature` sensor) is taken from the program for the current hour of the device clock, because the firmware reports a placeholder (`9`) in `tmpR` in that case. With Boost on, `tmpR` holds the real target (75 °C) and is used as is.
+### Sensors
 
-Programs can be written with the `tesy.set_schedule` action. Use 15-75 °C for a setpoint and `14` to switch heating off for an hour:
+| Entity | Description | Unit |
+|--------|-------------|------|
+| Temperature | Water temperature (showers on BelliSlimo) | °C |
+| Target temperature | Target the heater works to now | °C |
+| Energy consumed | Total energy, accumulated from the heating state × configured power | kWh |
+| Energy consumed (resettable) | Energy since the device counter was last reset | kWh |
+| Ready in | Minutes until the target is reached (if reported) | min |
+| Error status | `00` = no error; E01/E02 lower sensor open/short, E03/E04 upper sensor open/short | — |
+| Wi-Fi signal | Module RSSI | dBm |
+| Uptime | Module uptime | s |
+
+### Switches, buttons, binary sensors
+
+| Entity | Description |
+|--------|-------------|
+| Boost | One-time heating to 75 °C, then back to the current mode |
+| Child lock | Locks the heater panel (if supported) |
+| Reset consumed energy | Resets the resettable energy counter |
+| Sync time zone | Writes Home Assistant's time zone to the heater now |
+| Clock problem | On if the heater's time zone differs from Home Assistant's or its clock is more than 5 minutes off. Attributes: `problems`, `device_time`, `offset_seconds`, `timezone`, `expected_timezone` |
+
+## Weekly programs
+
+Write 24 hourly temperatures to one or more days of a program:
 
 ```yaml
 action: tesy.set_schedule
 target:
-  entity_id: water_heater.heater
+  entity_id: water_heater.boiler_modeco_2_heater
 data:
   program: 3
   days: [mo, tu, we, th, fr]   # optional, all days if omitted
   temperatures: [14, 14, 14, 14, 14, 14, 60, 60, 60, 14, 14, 14, 14, 14, 14, 14, 14, 14, 60, 60, 60, 60, 14, 14]
 ```
 
-Each day is a 24-byte hex string on the device and is written with `/api?name=prgP3MO&set=<48 hex chars>`.
+Use 15–75 for a setpoint, `14` to switch heating off for that hour, `null` for an hour without an entry. The card's schedule dialog uses this action.
 
-### Clock and time zone
+## Clock and time zone
 
-Weekly programs run on the heater's own clock. The module takes UTC from the network and converts it to local time with a POSIX TZ string in `tz` (e.g. `EET-2EEST,M3.5.0/3,M10.5.0/4`); the time itself cannot be set over the API, only `tz`.
+Programs run on the heater's own clock. The module takes UTC from the network and converts it to local time with a POSIX time zone string (`tz`); the time itself cannot be set over the API. The integration writes Home Assistant's time zone to the heater on start-up and whenever it changes in Home Assistant, if they differ. If the *Clock problem* sensor is on while the time zone is right, the module has no internet: restore the connection or set the time on the heater panel (hold **i** in standby).
 
-On devices that expose `tz` the integration keeps it in step with Home Assistant's time zone: on start-up and whenever the HA time zone changes it writes the matching POSIX string (taken from the tz database) if the heater differs.
+## Local API
 
-| Entity | Description |
-|--------|-------------|
-| `binary_sensor.clock_problem` | On if `tz` differs from HA's zone or the heater clock is more than 5 minutes off HA (e.g. no internet). Attributes: `problems`, `device_time`, `offset_seconds`, `timezone`, `expected_timezone` |
-| `button.sync_timezone` | Writes HA's time zone to the heater now |
+The integration talks to `http://<heater-ip>/api`. Everything is read with one request, `?name=_all`; values are written with `?name=<field>&set=<value>`.
 
-If the clock is off with the right time zone, the module has no internet; set the time on the panel (hold **i** in standby) or restore the connection.
+| Field | Description | Write |
+|-------|-------------|-------|
+| `pwr` | Power | `0` / `1` |
+| `mode` | Operation mode (see above) | `0`–`6` |
+| `tmpT` | Manual setpoint | `15`–`75` |
+| `tmpR` | Active target (placeholder `9` while a program runs without Boost) | — |
+| `tmpC` | Water temperature / showers | — |
+| `ht` | Heating element on | — |
+| `bst` | Boost | `0` / `1` |
+| `lck` | Child lock | `0` / `1` |
+| `prgP{1-3}{MO..SU}` | Weekly program day: 24 bytes hex, °C per hour, `0E` = off, `FF` = empty | 48 hex chars |
+| `tz` | POSIX time zone | string |
+| `date` | Device local time (only in `_all`) | — |
+| `err` | Error code | — |
+| `cdt` | Minutes until ready | — |
+| `pwc_t` | Heating element run time, s (updated by the firmware about hourly) | — |
+| `pwc_u` | Resettable run time counter | `0` = reset |
+| `wdBm`, `wup` | Wi-Fi RSSI, uptime | — |
+| `id`, `MAC`, `wsw`, `hsw` | Device type, MAC, firmware versions | — |
+| `tmpMX`, `parNF` | Max showers, extra parameters (BelliSlimo, double tank) | — |
 
-### Buttons
-
-| Entity | Description |
-|--------|-------------|
-| `button.energy_reset` | Reset the resettable energy counter |
-
-## Device API Parameters
-
-| Field | Description | Used By |
-|-------|-------------|---------|
-| `pwr` | Power state | Water heater |
-| `mode` | Operation mode | Water heater |
-| `tmpC` | Current temperature / showers | Temperature sensor |
-| `tmpT` | Target temperature setpoint | Water heater |
-| `tmpR` | Active target temperature (placeholder `9` while a program runs without Boost) | Target Temperature sensor |
-| `date` | Device local time (read-only, only in `_all`) | Program target lookup, clock check |
-| `tz` | POSIX time zone used for local time (writable) | Time zone sync |
-| `prgP{1-3}{MO..SU}` | Weekly programs, 24 bytes hex per day, °C per hour, `FF` = empty | Schedule attributes, `tesy.set_schedule` |
-| `ht` | Heating element active | `is_heating` attr |
-| `bst` | Boost flag | Boost switch |
-| `cdt` | Countdown timer (minutes) | Ready In sensor |
-| `err` | Error code | Error Status sensor |
-| `wdBm` | WiFi RSSI | WiFi Signal sensor |
-| `wup` | Uptime (seconds) | Uptime sensor |
-| `lck` | Child lock | Child Lock switch |
-| `pwc_t` | Runtime counter | Energy calculation |
-| `pwc_u` | Resettable runtime counter | Resettable Energy sensor |
-| `parNF` | Additional parameters | Dual-tank energy calculation |
-| `id` | Device type ID | Device detection |
-| `MAC` | MAC address | Unique ID |
-| `tmpMX` | Maximum showers | Max setpoint |
-| `wsw` | Software version | Device info |
-| `hsw` | Hardware version | Device info |
-
-## API Details
-
-The device exposes a local HTTP API at `http://{device_ip}/api`. You can retrieve all device parameters in a single request:
-
-```
-http://{device_ip}/api?name=_all
-```   
-
-This returns a JSON object with all fields listed in the table above.
-
-## Supported Devices
-
-| ID | Model | Range |
-|----|-------|-------|
-| 2000 | ModEco | 15-75°C |
-| 2002 | BelliSlimo | 0-4 showers |
-| 2003 | BiLight Smart | 15-75°C |
-| 2004 | ModEco 2 | 15-75°C |
-| 2005 | BelliSlimo Lite | 0-4 showers |
+Note: `_all` also returns the MyTESY account e-mail and the Wi-Fi SSID without authentication; keep the heater on a trusted network or an IoT VLAN.
 
 ## Translations
 
-Available in 10 languages: English, Bulgarian, German, French, Dutch, Spanish, Italian, Russian, Turkish, Ukrainian. Operation modes, sensors, switches, buttons, and config flow are all translated.
+Entities, modes and setup: English, Bulgarian, German, French, Dutch, Spanish, Italian, Russian, Turkish, Ukrainian. Options, the `set_schedule` action, the clock entities and the card: English, Russian and Ukrainian (other languages fall back to English).
+
+## Development
+
+```bash
+python -m unittest discover -s tests   # integration helpers
+node --test tests/js/card.test.mjs     # card helpers
+```
+
+## Credits
+
+- Original integration: [Dmitry Krasnoukhov (@krasnoukhov)](https://github.com/krasnoukhov) and [@artin961](https://github.com/artin961).
+- Weekly programs, thermostat card, time zone sync and poll options: [Pavel Starovoitov (@pollstar)](https://github.com/pollstar).

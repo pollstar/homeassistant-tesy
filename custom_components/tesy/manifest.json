@@ -2,15 +2,19 @@
   "domain": "tesy",
   "name": "Tesy",
   "codeowners": [
+    "@pollstar",
     "@krasnoukhov",
     "@artin961"
   ],
   "config_flow": true,
-  "dependencies": ["frontend", "http"],
-  "documentation": "https://github.com/krasnoukhov/homeassistant-tesy",
+  "dependencies": [
+    "frontend",
+    "http"
+  ],
+  "documentation": "https://github.com/pollstar/homeassistant-tesy",
   "integration_type": "device",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/krasnoukhov/homeassistant-tesy/issues",
+  "issue_tracker": "https://github.com/pollstar/homeassistant-tesy/issues",
   "requirements": [],
-  "version": "1.6.1"
+  "version": "1.7.0"
 }
