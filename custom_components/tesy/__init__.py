@@ -126,6 +126,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
+        coordinator: TesyCoordinator = hass.data[DOMAIN].pop(entry.entry_id)
+        # Let a request already on its way finish before a reload starts a new
+        # coordinator: the heater gets one request at a time.
+        coordinator.async_close()
+        await coordinator.async_wait_idle()
 
     return unload_ok

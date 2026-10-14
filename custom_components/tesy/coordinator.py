@@ -45,7 +45,6 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._refresh_unsub = None
         self._commands_in_flight = 0
         self._closed = False
-        self._refresh_task: asyncio.Task | None = None
         self._tz_lock = asyncio.Lock()
         # One request to the heater at a time: polls and commands never overlap,
         # so a read started before a write cannot report the pre-write state.
@@ -75,7 +74,11 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_update_data(self) -> dict[str, Any]:
         """Get new sensor data for Tesy component."""
         async with self._io_lock:
+            if self._closed:  # unloading: no new request to the heater
+                return self.data
             data = await self.hass.async_add_executor_job(self._get_data)
+            if self._closed:  # unloaded while waiting for the reply: drop it
+                return self.data
             self.data_received_at = dt_util.utcnow()
         return data
 
@@ -109,10 +112,16 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         self._closed = True
         self.async_cancel_refresh()
-        # A follow-up poll already talking to the heater: drop its result.
-        if self._refresh_task and not self._refresh_task.done():
-            self._refresh_task.cancel()
-        self._refresh_task = None
+
+    async def async_wait_idle(self) -> None:
+        """Wait until no request to the heater is in flight.
+
+        A request cannot be cancelled once its thread has started; unloading
+        waits for it, so a reloaded entry never talks to the heater at the same
+        time. Its result is dropped (see _async_update_data).
+        """
+        async with self._io_lock:
+            pass
 
     @callback
     def async_cancel_refresh(self) -> None:
@@ -167,9 +176,7 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         def _run(_now) -> None:
             self._refresh_unsub = None
             if not self._closed:
-                self._refresh_task = self.hass.async_create_task(
-                    self.async_request_refresh()
-                )
+                self.hass.async_create_task(self.async_request_refresh())
 
         self._refresh_unsub = async_call_later(self.hass, delay, _run)
 
