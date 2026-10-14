@@ -45,6 +45,7 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._refresh_unsub = None
         self._commands_in_flight = 0
         self._closed = False
+        self._refresh_task: asyncio.Task | None = None
         self._tz_lock = asyncio.Lock()
         # When the last _all reply arrived: its date is the heater clock then.
         self.data_received_at: datetime | None = None
@@ -103,6 +104,10 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         self._closed = True
         self.async_cancel_refresh()
+        # A follow-up poll already talking to the heater: drop its result.
+        if self._refresh_task and not self._refresh_task.done():
+            self._refresh_task.cancel()
+        self._refresh_task = None
 
     @callback
     def async_cancel_refresh(self) -> None:
@@ -156,7 +161,10 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         @callback
         def _run(_now) -> None:
             self._refresh_unsub = None
-            self.hass.async_create_task(self.async_request_refresh())
+            if not self._closed:
+                self._refresh_task = self.hass.async_create_task(
+                    self.async_request_refresh()
+                )
 
         self._refresh_unsub = async_call_later(self.hass, delay, _run)
 
