@@ -19,7 +19,6 @@ from pathlib import Path
 from aiohttp import web
 
 from homeassistant.components.http import HomeAssistantView
-from homeassistant.core import HomeAssistant
 
 CARD_URL = "/tesy_static/tesy-boiler-card.js"
 CARD_PATH = Path(__file__).parent / "frontend" / "tesy-boiler-card.js"
@@ -32,25 +31,26 @@ def card_hash(content: bytes) -> str:
 
 
 class TesyCardView(HomeAssistantView):
-    """The card's JavaScript, always revalidated."""
+    """The card's JavaScript, always revalidated.
+
+    It serves the bytes read when Home Assistant started, not the file on disk:
+    an update (HACS) replaces the file before the restart, and the new card must
+    not run against the old integration code under the old version.
+    """
 
     url = CARD_URL
     name = "tesy:card"
     requires_auth = False  # loaded by the browser like any frontend module
 
-    def __init__(self, path: Path = CARD_PATH) -> None:
-        """Serve the file at path."""
-        self._path = path
+    def __init__(self, content: bytes) -> None:
+        """Serve content (the card as read at start-up)."""
+        self._content = content
+        self._etag = f'"{card_hash(content)}"'
 
     async def get(self, request: web.Request) -> web.StreamResponse:
         """Return the card, or 304 if the browser already has this version."""
-        hass: HomeAssistant = request.app["hass"]
-        try:
-            content = await hass.async_add_executor_job(self._path.read_bytes)
-        except OSError:
-            return web.Response(status=HTTPStatus.NOT_FOUND)
-
-        etag = f'"{card_hash(content)}"'
+        content = self._content
+        etag = self._etag
         headers = {"Cache-Control": "no-cache", "ETag": etag}
         if etag in request.headers.get("If-None-Match", ""):
             return web.Response(status=HTTPStatus.NOT_MODIFIED, headers=headers)

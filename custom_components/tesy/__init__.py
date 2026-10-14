@@ -45,7 +45,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         return True
     content = await hass.async_add_executor_job(CARD_PATH.read_bytes)
     version = card_hash(content)
-    hass.http.register_view(TesyCardView())
+    hass.http.register_view(TesyCardView(content))
     hass.http.register_view(TesyCardVersionView(version))
     hass.data[CARD_DATA] = {"version": version, "loaded": False}
     return True
