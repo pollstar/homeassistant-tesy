@@ -10,7 +10,7 @@
  *   entity: water_heater.boiler_modeco_2_heater
  */
 
-export const CARD_VERSION = "0.1.9";
+export const CARD_VERSION = "0.1.10";
 
 export const DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 export const MODES = ["performance", "p1", "p2", "p3", "eco", "ec2", "ec3"];
@@ -792,6 +792,8 @@ class TesyBoilerDialog extends Base {
   }
 
   close(force) {
+    // While writing, the dialog stays open: it closes itself when done.
+    if (!force && this._st?.saving) return;
     if (!force && this._kind === "schedule" && this._dirtyDays().length && !window.confirm(strings(this._hass).discard)) return;
     window.removeEventListener("keydown", this._onKey);
     window.removeEventListener("resize", this._onResize);
@@ -859,11 +861,11 @@ class TesyBoilerDialog extends Base {
     this.shadowRoot.innerHTML = `
       <style>${PALETTE}${DIALOG_CSS}</style>
       <div class="tesy ${theme} backdrop" data-action="backdrop">
-        <div class="panel ${wide ? "wide" : ""} ${this._kind}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+        <div class="panel ${wide ? "wide" : ""} ${this._kind} ${this._st.saving ? "busy" : ""}" role="dialog" aria-modal="true" aria-label="${esc(title)}" ${this._st.saving ? 'aria-busy="true"' : ""}>
           <div class="dhead">
             <h2>${esc(title)}</h2>
             ${this._kind === "schedule" && this._edit ? `<span class="pill warm">${esc(s.running)} P${esc(this._hass.states[this._config.entity]?.attributes?.active_program || "—")}</span>` : ""}
-            <button type="button" class="x" data-action="close" aria-label="${esc(s.close)}">${CLOSE_ICON}</button>
+            <button type="button" class="x" data-action="close" aria-label="${esc(s.close)}" ${this._st.saving ? "disabled" : ""}>${CLOSE_ICON}</button>
           </div>
           ${body}
         </div>
@@ -1038,6 +1040,7 @@ class TesyBoilerDialog extends Base {
   // ---- events
 
   _onInput(e) {
+    if (this._st.saving) return; // edits made now would not be written
     const el = e.target.closest("[data-input]");
     if (!el) return;
     if (el.dataset.input === "brush") {
@@ -1062,6 +1065,7 @@ class TesyBoilerDialog extends Base {
     const a = el.dataset.action;
     if (a === "backdrop" && e.target !== el) return;
     const st = this._st;
+    if (st.saving) return; // frozen until the write finishes
     switch (a) {
       case "backdrop":
       case "close": this.close(); return;
@@ -1111,6 +1115,7 @@ class TesyBoilerDialog extends Base {
 }
 
 const DIALOG_CSS = `
+  .panel.busy > :not(.dhead) { pointer-events: none; opacity: .6; }
   .backdrop { position: fixed; inset: 0; z-index: 9; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; font-family: var(--paper-font-body1_-_font-family, inherit); }
   .panel { box-sizing: border-box; width: min(460px, 100vw); max-height: 100vh; overflow: auto; padding: 20px 24px 24px; border-radius: 24px; display: flex; flex-direction: column; gap: 16px;
            background: var(--ha-card-background, var(--card-background-color, #171b20)); color: var(--t-text); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
