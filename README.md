@@ -23,9 +23,14 @@ Water heaters with the ESP32 Wi-Fi module (black PCB) and its local API at `http
 | 2004 | ModEco 2 | 15–75 °C |
 | 2005 | BelliSlimo Lite | 0–4 showers |
 
-Tested with:
+The features added in this fork (weekly programs, card, time zone sync, poll options) are tested only with:
 
-- Tesy ModEco Cloud GCV 100 47 24D C22 ECW (ModEco 2, id 2004, firmware 200407 / Wi-Fi 0.29) — weekly programs, card, time zone sync
+- Tesy ModEco Cloud GCV 100 47 24D C22 ECW (ModEco 2, id 2004, firmware 200407 / Wi-Fi 0.29)
+
+Other models may differ in the fields they report; reports from owners of other models are welcome in [issues](https://github.com/pollstar/homeassistant-tesy/issues).
+
+The original integration (basic control) was reported working by its authors and users with:
+
 - [Tesy ModEco Cloud GCV 150 47 24D C22 ECW](https://tesy.com/products/electric-water-heaters/modeco-series/modeco-cloud/?product=gcv-1504724d-c22-ecw)
 - BiLight Smart, BelliSlimo
 - [Tesy BelliSlimo Cloud GCR 80 27 22 E31 ECW](https://tesy.com/products/electric-water-heaters/bellislimo-series/bellislimo-cloud/?product=gcr-80-27-22-e31-ecw)
