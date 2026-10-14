@@ -10,7 +10,7 @@
  *   entity: water_heater.boiler_modeco_2_heater
  */
 
-export const CARD_VERSION = "0.1.4";
+export const CARD_VERSION = "0.1.5";
 
 export const DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 export const MODES = ["performance", "p1", "p2", "p3", "eco", "ec2", "ec3"];
@@ -48,6 +48,7 @@ const STRINGS = {
     firmware: "Прошивка", clockRow: "Часы", ok: "в порядке", codes: "Коды ошибок",
     e01: "обрыв нижнего датчика", e02: "КЗ нижнего датчика", e03: "обрыв верхнего датчика", e04: "КЗ верхнего датчика",
     h: "ч", min: "мин", kwh: "кВт·ч", noEntity: "Сущность не найдена",
+    stale: "Карточка обновлена — перезагрузите страницу", reload: "Обновить",
   },
   uk: {
     days: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"],
@@ -74,6 +75,7 @@ const STRINGS = {
     firmware: "Прошивка", clockRow: "Годинник", ok: "в порядку", codes: "Коди помилок",
     e01: "обрив нижнього датчика", e02: "КЗ нижнього датчика", e03: "обрив верхнього датчика", e04: "КЗ верхнього датчика",
     h: "год", min: "хв", kwh: "кВт·год", noEntity: "Сутність не знайдено",
+    stale: "Картку оновлено — перезавантажте сторінку", reload: "Оновити",
   },
   en: {
     days: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"],
@@ -100,6 +102,7 @@ const STRINGS = {
     firmware: "Firmware", clockRow: "Clock", ok: "OK", codes: "Error codes",
     e01: "lower sensor open", e02: "lower sensor short", e03: "upper sensor open", e04: "upper sensor short",
     h: "h", min: "min", kwh: "kWh", noEntity: "Entity not found",
+    stale: "The card was updated — reload the page", reload: "Reload",
   },
 };
 
@@ -219,6 +222,49 @@ export function heaterView(stateObj, boostOn) {
   return { available, power, mode, target, current, off, heating, status, manual: mode === "performance" };
 }
 
+// ---------------------------------------------------------------- version
+
+/** Version the card was loaded with: the ?v= of its module URL. */
+export function loadedVersion(moduleUrl) {
+  try {
+    return new URL(moduleUrl).searchParams.get("v");
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * What to do about a page loaded with an older card than the server serves:
+ * "ok", "reload" (once per server version) or "banner" (reload did not help).
+ */
+export function staleAction(loaded, server, reloadedFor) {
+  if (!loaded || !server || loaded === server) return "ok";
+  return reloadedFor === server ? "banner" : "reload";
+}
+
+const RELOAD_KEY = "tesy-boiler-card-reloaded-for";
+const LOADED_VERSION = loadedVersion(import.meta.url);
+let versionCheck = null; // one check per page, shared by all cards
+
+function checkVersion(hass, autoReload) {
+  if (!versionCheck) {
+    versionCheck = hass
+      .callApi("GET", "tesy/card_version")
+      .then((r) => {
+        let reloadedFor = null;
+        try { reloadedFor = window.sessionStorage.getItem(RELOAD_KEY); } catch (e) { /* storage blocked */ }
+        const action = staleAction(LOADED_VERSION, r?.version, reloadedFor);
+        if (action === "reload" && autoReload) {
+          try { window.sessionStorage.setItem(RELOAD_KEY, r.version); } catch (e) { /* storage blocked */ }
+          window.location.reload();
+        }
+        return action === "ok" ? "ok" : "banner";
+      })
+      .catch(() => "ok"); // older integration without the endpoint
+  }
+  return versionCheck;
+}
+
 // ---------------------------------------------------------------- styles
 
 const PALETTE = `
@@ -313,6 +359,11 @@ class TesyBoilerCard extends Base {
     const old = this._hass;
     this._hass = hass;
     if (this._dialog) this._dialog.hass = hass;
+    if (!old && hass?.callApi) {
+      checkVersion(hass, this._config?.auto_reload !== false).then((r) => {
+        if (r !== "ok" && !this._stale) { this._stale = true; this._render(); }
+      });
+    }
     if (this._drag) return; // keep the handle under the finger
     if (!old || this._changed(old, hass)) this._render();
   }
@@ -451,6 +502,7 @@ class TesyBoilerCard extends Base {
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"></path><path d="M7 15l4-4 3 3 5-6"></path></svg></button>
           </div>
 
+          ${this._stale ? `<div class="warn" role="status"><span>${esc(s.stale)}</span><button type="button" data-action="reload">${esc(s.reload)}</button></div>` : ""}
           ${clockBad ? `<div class="warn" role="status"><span>${esc(s.clockProblem)}</span>${this._ents.sync_timezone ? `<button type="button" data-action="sync">${esc(s.sync)}</button>` : ""}</div>` : ""}
           ${clockText ? `<div class="clock num">${esc(clockText)}</div>` : ""}
         </div>
@@ -533,6 +585,9 @@ class TesyBoilerCard extends Base {
         break;
       case "sync":
         this._call("button", "press", { entity_id: this._ents.sync_timezone });
+        break;
+      case "reload":
+        window.location.reload();
         break;
       case "schedule":
       case "stats":

@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   tempRole, angleFor, tempFromPoint, scheduleCalls, heaterView, deviceEntities, DAYS,
+  loadedVersion, staleAction,
 } from "../../custom_components/tesy/frontend/tesy-boiler-card.js";
 
 test("temperature roles", () => {
@@ -70,4 +71,16 @@ test("device entities by translation key with entity_id fallback", () => {
   assert.equal(e.energy_consumed, "sensor.b_energy_consumed");
   assert.equal(e.energy_consumed_resettable, "sensor.b_energy_consumed_resettable");
   assert.equal(e.device.model, "ModEco 2");
+});
+
+test("stale page detection reloads once, then shows a banner", () => {
+  assert.equal(loadedVersion("https://ha.example/tesy_static/tesy-boiler-card.js?v=183e0b81"), "183e0b81");
+  assert.equal(loadedVersion("https://ha.example/local/tesy-boiler-card.js"), null);
+  assert.equal(loadedVersion("not a url"), null);
+  assert.equal(staleAction("aaaa", "aaaa", null), "ok");
+  assert.equal(staleAction(null, "bbbb", null), "ok");        // loaded without ?v= (manual resource)
+  assert.equal(staleAction("aaaa", undefined, null), "ok");   // integration without the endpoint
+  assert.equal(staleAction("aaaa", "bbbb", null), "reload");
+  assert.equal(staleAction("aaaa", "bbbb", "bbbb"), "banner"); // already reloaded for this version
+  assert.equal(staleAction("aaaa", "cccc", "bbbb"), "reload"); // newer update again
 });

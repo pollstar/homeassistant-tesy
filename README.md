@@ -41,6 +41,7 @@ entity: water_heater.boiler_modeco_2_heater
 name: Boiler
 subtitle: ModEco 2 · 100 L
 animation: always  # auto (default: off when the system asks for reduced motion) | always | off
+auto_reload: false # do not reload an outdated page by itself, only show a banner
 ```
 
 - Dial with the current water temperature and the active target; the drag handle sets the manual setpoint (manual mode only).
@@ -51,6 +52,8 @@ animation: always  # auto (default: off when the system asks for reduced motion)
 - Follows the Home Assistant light/dark theme; Russian, Ukrainian and English.
 
 Related entities (Boost switch, energy and diagnostic sensors, clock sensor) are found automatically on the same device.
+
+**Updates and caching.** The card is served with `Cache-Control: no-cache` and an ETag, so browsers and reverse proxies (Cloudflare, nginx) check for a newer file on every page load. A page that was opened before Home Assistant restarted with a new card (e.g. a wall tablet) notices it and reloads itself once; if that does not help, the card shows a "reload" banner. A page that never loaded the card at all still needs one manual reload (Ctrl+F5, or "Clear frontend cache" in the companion app).
 
 ## Installation
 
