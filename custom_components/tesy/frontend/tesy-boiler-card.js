@@ -10,7 +10,7 @@
  *   entity: water_heater.boiler_modeco_2_heater
  */
 
-export const CARD_VERSION = "0.1.7";
+export const CARD_VERSION = "0.1.8";
 
 export const DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 export const MODES = ["performance", "p1", "p2", "p3", "eco", "ec2", "ec3"];
@@ -50,6 +50,7 @@ const STRINGS = {
     h: "ч", min: "мин", kwh: "кВт·ч", noEntity: "Сущность не найдена",
     unsupported: "Эта карточка пока поддерживает только проверенные модели (ModEco 2). Для этого бойлера используйте стандартную карточку термостата.",
     stale: "Карточка обновлена — перезагрузите страницу", reload: "Обновить",
+    failed: "Бойлер не принял команду",
   },
   uk: {
     days: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"],
@@ -78,6 +79,7 @@ const STRINGS = {
     h: "год", min: "хв", kwh: "кВт·год", noEntity: "Сутність не знайдено",
     unsupported: "Ця картка поки підтримує лише перевірені моделі (ModEco 2). Для цього бойлера використовуйте стандартну картку термостата.",
     stale: "Картку оновлено — перезавантажте сторінку", reload: "Оновити",
+    failed: "Бойлер не прийняв команду",
   },
   en: {
     days: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"],
@@ -106,6 +108,7 @@ const STRINGS = {
     h: "h", min: "min", kwh: "kWh", noEntity: "Entity not found",
     unsupported: "This card supports verified models only (ModEco 2 so far). Use the standard thermostat card for this heater.",
     stale: "The card was updated — reload the page", reload: "Reload",
+    failed: "The heater did not accept the command",
   },
 };
 
@@ -265,25 +268,54 @@ export function staleAction(loaded, server, reloadedFor) {
 
 const RELOAD_KEY = "tesy-boiler-card-reloaded-for";
 const LOADED_VERSION = loadedVersion(import.meta.url);
-let versionCheck = null; // one check per page, shared by all cards
+let serverVersion = null; // one request per page, shared by all cards
+let reloading = false;
 
-function checkVersion(hass, autoReload) {
-  if (!versionCheck) {
-    versionCheck = hass
-      .callApi("GET", "tesy/card_version")
-      .then((r) => {
-        let reloadedFor = null;
-        try { reloadedFor = window.sessionStorage.getItem(RELOAD_KEY); } catch (e) { /* storage blocked */ }
-        const action = staleAction(LOADED_VERSION, r?.version, reloadedFor);
-        if (action === "reload" && autoReload) {
-          try { window.sessionStorage.setItem(RELOAD_KEY, r.version); } catch (e) { /* storage blocked */ }
-          window.location.reload();
-        }
-        return action === "ok" ? "ok" : "banner";
-      })
-      .catch(() => "ok"); // older integration without the endpoint
+/**
+ * Remember that the page was reloaded for this server version. Returns false
+ * if that cannot be stored (storage blocked): then reloading could loop, so
+ * the caller shows the banner instead.
+ */
+export function markReloaded(storage, version) {
+  try {
+    storage.setItem(RELOAD_KEY, version);
+    return storage.getItem(RELOAD_KEY) === version;
+  } catch (e) {
+    return false;
   }
-  return versionCheck;
+}
+
+function readReloaded(storage) {
+  try {
+    return storage.getItem(RELOAD_KEY);
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Compare the loaded card with the server's. Each card applies its own
+ * auto_reload: one that allows it reloads the page (once per server version),
+ * the others show the banner.
+ */
+async function checkVersion(hass, autoReload) {
+  if (!serverVersion) {
+    serverVersion = hass
+      .callApi("GET", "tesy/card_version")
+      .then((r) => r?.version ?? null)
+      .catch(() => null); // older integration without the endpoint
+  }
+  const server = await serverVersion;
+  let storage = null;
+  try { storage = window.sessionStorage; } catch (e) { /* storage blocked */ }
+  const action = staleAction(LOADED_VERSION, server, storage ? readReloaded(storage) : null);
+  if (action === "ok") return "ok";
+  if (action === "reload" && autoReload && (reloading || (storage && markReloaded(storage, server)))) {
+    reloading = true;
+    window.location.reload();
+    return "ok";
+  }
+  return "banner";
 }
 
 // ---------------------------------------------------------------- styles
@@ -409,8 +441,18 @@ class TesyBoilerCard extends Base {
     return ids.some((id) => old.states[id] !== hass.states[id]);
   }
 
+  /** Call a service; on failure show a short error. Resolves to true on success. */
   _call(domain, service, data) {
-    return this._hass.callService(domain, service, data);
+    return this._hass.callService(domain, service, data).then(
+      () => true,
+      (err) => {
+        this._error = err?.message || String(err);
+        clearTimeout(this._errorTimer);
+        this._errorTimer = setTimeout(() => { this._error = ""; this._render(); }, 8000);
+        this._render();
+        return false;
+      }
+    );
   }
 
   _render() {
@@ -530,6 +572,7 @@ class TesyBoilerCard extends Base {
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"></path><path d="M7 15l4-4 3 3 5-6"></path></svg></button>
           </div>
 
+          ${this._error ? `<div class="warn" role="alert"><span>${esc(s.failed)}: ${esc(this._error)}</span></div>` : ""}
           ${this._stale ? `<div class="warn" role="status"><span>${esc(s.stale)}</span><button type="button" data-action="reload">${esc(s.reload)}</button></div>` : ""}
           ${clockBad ? `<div class="warn" role="status"><span>${esc(s.clockProblem)}</span>${this._ents.sync_timezone ? `<button type="button" data-action="sync">${esc(s.sync)}</button>` : ""}</div>` : ""}
           ${clockText ? `<div class="clock num">${esc(clockText)}</div>` : ""}
@@ -590,11 +633,15 @@ class TesyBoilerCard extends Base {
     this._optimisticTimer = setTimeout(() => this._render(), 15100);
     clearTimeout(this._pendingTimer);
     this._pendingTimer = setTimeout(() => { this._pendingTarget = undefined; this._render(); }, 8000);
-    try {
-      await this._call("water_heater", "set_temperature", { entity_id: this._config.entity, temperature: t });
-    } finally {
-      this._render();
+    const ok = await this._call("water_heater", "set_temperature", { entity_id: this._config.entity, temperature: t });
+    if (!ok) {
+      // Do not keep showing a setpoint and heating state the heater never got.
+      this._optimistic = null;
+      this._pendingTarget = undefined;
+      clearTimeout(this._optimisticTimer);
+      clearTimeout(this._pendingTimer);
     }
+    this._render();
   }
 
   _onClick(e) {
@@ -619,15 +666,20 @@ class TesyBoilerCard extends Base {
         break;
       case "schedule":
       case "stats":
-        this._openDialog(btn.dataset.action);
+        this._openDialog(btn.dataset.action, btn);
         break;
     }
   }
 
-  _openDialog(kind) {
+  _openDialog(kind, opener) {
     this._dialog?.close(true);
     const dialog = document.createElement("tesy-boiler-dialog");
-    dialog.setup(kind, this._config, this._ents, () => { if (this._dialog === dialog) this._dialog = null; });
+    dialog.setup(kind, this._config, this._ents, () => {
+      if (this._dialog === dialog) this._dialog = null;
+      // Back to the button that opened it (re-rendered: find it by action).
+      const again = this.shadowRoot?.querySelector(`[data-action="${kind}"]`) || opener;
+      if (again?.isConnected) again.focus();
+    });
     dialog.hass = this._hass;
     document.body.appendChild(dialog);
     this._dialog = dialog;
@@ -686,7 +738,10 @@ class TesyBoilerDialog extends Base {
     this.shadowRoot.addEventListener("click", (e) => this._onClick(e));
     this.shadowRoot.addEventListener("input", (e) => this._onInput(e));
     this.shadowRoot.addEventListener("change", (e) => this._onInput(e));
-    this._onKey = (e) => { if (e.key === "Escape") this.close(); };
+    this._onKey = (e) => {
+      if (e.key === "Escape") this.close();
+      else if (e.key === "Tab") this._trapFocus(e);
+    };
     this._onResize = () => this._render();
     window.addEventListener("keydown", this._onKey);
     window.addEventListener("resize", this._onResize);
@@ -704,6 +759,23 @@ class TesyBoilerDialog extends Base {
         || ids.some((id) => old.states[id] !== hass.states[id])) {
       this._render();
     }
+  }
+
+  /** Keep Tab / Shift+Tab inside the dialog while it is open. */
+  _trapFocus(e) {
+    const items = [...this.shadowRoot.querySelectorAll(
+      ".panel button:not([disabled]), .panel input:not([disabled]), .panel select:not([disabled]), .panel [tabindex]:not([tabindex='-1'])"
+    )];
+    if (!items.length) return;
+    const first = items[0], last = items[items.length - 1];
+    const active = this.shadowRoot.activeElement;
+    if (!active || !items.includes(active)) { e.preventDefault(); first.focus(); }
+    else if (e.shiftKey && active === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
+  }
+
+  connectedCallback() {
+    this._render();
   }
 
   close(force) {
@@ -790,7 +862,8 @@ class TesyBoilerDialog extends Base {
         (el) => ["action", "day", "hour", "prog", "mode", "input", "set", "step"].map((k) => el.dataset[k] ?? "").join("|") === focusKey
       );
       again?.focus();
-    } else if (!this._focused) {
+    } else if (!this._focused && this.isConnected) {
+      // Move focus into the dialog once it is on the page.
       this._focused = true;
       this.shadowRoot.querySelector(".x")?.focus();
     }

@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   tempRole, angleFor, tempFromPoint, scheduleCalls, heaterView, deviceEntities, DAYS,
-  loadedVersion, staleAction, pickLang, cardSupported,
+  loadedVersion, staleAction, pickLang, cardSupported, markReloaded,
 } from "../../custom_components/tesy/frontend/tesy-boiler-card.js";
 
 test("temperature roles", () => {
@@ -102,4 +102,15 @@ test("card support follows the tesy_features attribute", () => {
   assert.equal(cardSupported({ state: "performance", attributes: {} }), false);
   assert.equal(cardSupported({ state: "unavailable", attributes: {} }), null);
   assert.equal(cardSupported(undefined), null);
+});
+
+test("reload marker: no reload loop when storage is blocked", () => {
+  const store = new Map();
+  const ok = { setItem: (k, v) => store.set(k, v), getItem: (k) => store.get(k) ?? null };
+  assert.equal(markReloaded(ok, "abc"), true);
+  assert.equal(staleAction("old", "abc", ok.getItem("tesy-boiler-card-reloaded-for")), "banner");
+  const blocked = { setItem: () => { throw new Error("SecurityError"); }, getItem: () => null };
+  assert.equal(markReloaded(blocked, "abc"), false);
+  const ignored = { setItem: () => {}, getItem: () => null }; // e.g. a no-op storage
+  assert.equal(markReloaded(ignored, "abc"), false);
 });
