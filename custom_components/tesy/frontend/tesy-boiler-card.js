@@ -10,7 +10,7 @@
  *   entity: water_heater.boiler_modeco_2_heater
  */
 
-export const CARD_VERSION = "0.1.14";
+export const CARD_VERSION = "0.1.15";
 
 export const DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 export const MODES = ["performance", "p1", "p2", "p3", "eco", "ec2", "ec3"];
@@ -263,6 +263,19 @@ export function wallClock(value) {
   const date = new Date(Date.UTC(y, mo - 1, d)); // UTC only as a container
   if (date.getUTCMonth() !== mo - 1 || h > 23 || mi > 59) return null;
   return { day: (date.getUTCDay() + 6) % 7, hour: h, minute: mi };
+}
+
+const DURATION_SECONDS = { ms: 0.001, s: 1, min: 60, h: 3600, d: 86400, w: 604800 };
+
+/**
+ * A duration sensor state in seconds, whatever display unit the user picked
+ * for it in Home Assistant (s, min, h, d…). null when unknown.
+ */
+export function durationSeconds(state, unit) {
+  const n = Number(state);
+  const factor = DURATION_SECONDS[unit || "s"];
+  if (state === null || state === undefined || state === "" || Number.isNaN(n) || factor === undefined) return null;
+  return n * factor;
 }
 
 /** Identifies a control across re-renders (the DOM is rebuilt on updates). */
@@ -971,14 +984,20 @@ class TesyBoilerDialog extends Base {
       unknown: ["neutral", "—"],
     }[err.kind];
     const rssi = Number(st(this._ents.wifi_signal)?.state);
-    const up = Number(st(this._ents.uptime)?.state);
-    const upText = Number.isNaN(up) ? "—" : `${Math.floor(up / 3600)} ${s.h} ${Math.floor((up % 3600) / 60)} ${s.min}`;
+    const upState = st(this._ents.uptime);
+    const up = durationSeconds(upState?.state, upState?.attributes?.unit_of_measurement);
+    const upText = up === null ? "—" : `${Math.floor(up / 3600)} ${s.h} ${Math.floor((up % 3600) / 60)} ${s.min}`;
+    // Energy in the unit the user chose for the sensor (kWh, Wh, MWh…).
+    const energyUnit = (id) => {
+      const unit = st(id)?.attributes?.unit_of_measurement;
+      return !unit || unit === "kWh" ? s.kwh : unit;
+    };
     const dev = this._ents.device;
     const clockBad = st(this._ents.clock_problem)?.state === "on";
     return `
       <div class="kpis">
-        <div class="kpi"><div class="k">${esc(s.energyTotal)}</div><div class="v num">${val(this._ents.energy_consumed)}<span> ${esc(s.kwh)}</span></div></div>
-        <div class="kpi"><div class="k">${esc(s.energyReset)}</div><div class="v num">${val(this._ents.energy_consumed_resettable)}<span> ${esc(s.kwh)}</span></div></div>
+        <div class="kpi"><div class="k">${esc(s.energyTotal)}</div><div class="v num">${val(this._ents.energy_consumed)}<span> ${esc(energyUnit(this._ents.energy_consumed))}</span></div></div>
+        <div class="kpi"><div class="k">${esc(s.energyReset)}</div><div class="v num">${val(this._ents.energy_consumed_resettable)}<span> ${esc(energyUnit(this._ents.energy_consumed_resettable))}</span></div></div>
       </div>
       <div class="rows">
         <div class="row"><span>${esc(s.errors)}</span><span class="pill ${errPill[0]}">${errPill[1]}</span></div>

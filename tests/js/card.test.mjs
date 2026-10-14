@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   tempRole, angleFor, tempFromPoint, scheduleCalls, heaterView, deviceEntities, DAYS,
-  loadedVersion, staleAction, pickLang, cardSupported, markReloaded, errorView, numberLocale, versionCheckDue, wallClock, focusKey,
+  loadedVersion, staleAction, pickLang, cardSupported, markReloaded, errorView, numberLocale, versionCheckDue, wallClock, focusKey, durationSeconds,
 } from "../../custom_components/tesy/frontend/tesy-boiler-card.js";
 
 test("temperature roles", () => {
@@ -156,4 +156,14 @@ test("focus key identifies a control across re-renders", () => {
   assert.notEqual(focusKey(el({ action: "mode", mode: "p1" })), focusKey(el({ action: "mode", mode: "p2" })));
   assert.equal(focusKey(el({}, "slider")), "||slider");
   assert.equal(focusKey(null), null);
+});
+
+test("uptime in seconds whatever unit HA displays it in", () => {
+  assert.equal(durationSeconds("17640", "s"), 17640);
+  assert.equal(durationSeconds("17640", undefined), 17640);
+  assert.equal(durationSeconds("12", "h"), 43200);
+  assert.equal(durationSeconds("4.9", "h"), 17640);
+  assert.equal(durationSeconds("294", "min"), 17640);
+  assert.equal(durationSeconds("2", "d"), 172800);
+  for (const [v, u] of [["unavailable", "s"], ["", "s"], [undefined, "s"], ["5", "fortnight"]]) assert.equal(durationSeconds(v, u), null);
 });
