@@ -63,6 +63,16 @@ class ScheduleCodecTest(TestCase):
             # 48 chars, but fromhex skips the spaces: only 23 bytes
             schedule.decode_day("0E" * 23 + "  ")
 
+    def test_whole_number(self):
+        self.assertEqual(schedule.whole_number(2), 2)
+        self.assertEqual(schedule.whole_number("2"), 2)
+        self.assertEqual(schedule.whole_number(2.0), 2)
+        for bad in (2.9, "50.7", "x", True):
+            with self.assertRaises(ValueError):
+                schedule.whole_number(bad)
+        with self.assertRaises(TypeError):
+            schedule.whole_number(None)
+
     def test_schedule_key(self):
         self.assertEqual(schedule.schedule_key(3, "mo"), "prgP3MO")
         with self.assertRaises(ValueError):

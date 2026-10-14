@@ -45,6 +45,20 @@ def schedule_key(program: int, day: str) -> str:
     return f"prgP{program}{day}"
 
 
+def whole_number(value: Any) -> int:
+    """Return value as an int; reject fractions instead of truncating them.
+
+    Accepts ints, numeric strings (``"2"``) and integral floats (``2.0``, as
+    UI selectors may send them).
+    """
+    if isinstance(value, bool):
+        raise ValueError(f"Expected a whole number, got {value!r}")
+    number = float(value)  # ValueError / TypeError on non-numbers
+    if not number.is_integer():
+        raise ValueError(f"Expected a whole number, got {value!r}")
+    return int(number)
+
+
 def decode_day(value: str) -> list[int | None]:
     """Decode a 48-char hex day into 24 hourly temperatures (None = empty)."""
     if not isinstance(value, str) or len(value) != HOURS_PER_DAY * 2:

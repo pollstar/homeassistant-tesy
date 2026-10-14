@@ -54,6 +54,7 @@ from .schedule import (
     encode_day,
     get_program,
     schedule_key,
+    whole_number,
 )
 
 SERVICE_SET_SCHEDULE = "set_schedule"
@@ -61,8 +62,17 @@ ATTR_PROGRAM = "program"
 ATTR_DAYS = "days"
 ATTR_TEMPERATURES = "temperatures"
 
+
+def _whole_number(value: Any) -> int:
+    """Voluptuous validator: a whole number, fractions rejected."""
+    try:
+        return whole_number(value)
+    except (TypeError, ValueError) as err:
+        raise vol.Invalid(str(err)) from err
+
+
 SET_SCHEDULE_SCHEMA = {
-    vol.Required(ATTR_PROGRAM): vol.All(vol.Coerce(int), vol.In(PROGRAMS)),
+    vol.Required(ATTR_PROGRAM): vol.All(_whole_number, vol.In(PROGRAMS)),
     vol.Optional(ATTR_DAYS, default=[day.lower() for day in DAYS]): vol.All(
         cv.ensure_list,
         vol.Length(min=1, max=len(DAYS)),
@@ -75,7 +85,8 @@ SET_SCHEDULE_SCHEMA = {
             vol.Any(
                 None,
                 vol.All(
-                    vol.Coerce(int), vol.Range(min=MIN_SLOT_TEMP, max=MAX_SLOT_TEMP)
+                    _whole_number,
+                    vol.Range(min=MIN_SLOT_TEMP, max=MAX_SLOT_TEMP),
                 ),
             )
         ],
