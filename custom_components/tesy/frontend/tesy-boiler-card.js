@@ -10,7 +10,7 @@
  *   entity: water_heater.boiler_modeco_2_heater
  */
 
-export const CARD_VERSION = "0.1.13";
+export const CARD_VERSION = "0.1.14";
 
 export const DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 export const MODES = ["performance", "p1", "p2", "p3", "eco", "ec2", "ec3"];
@@ -263,6 +263,13 @@ export function wallClock(value) {
   const date = new Date(Date.UTC(y, mo - 1, d)); // UTC only as a container
   if (date.getUTCMonth() !== mo - 1 || h > 23 || mi > 59) return null;
   return { day: (date.getUTCDay() + 6) % 7, hour: h, minute: mi };
+}
+
+/** Identifies a control across re-renders (the DOM is rebuilt on updates). */
+export function focusKey(el) {
+  if (!el) return null;
+  const d = el.dataset || {};
+  return [d.action || "", d.mode || "", el.getAttribute?.("role") || ""].join("|");
 }
 
 export function heaterView(stateObj, boostOn) {
@@ -593,6 +600,8 @@ class TesyBoilerCard extends Base {
       ? (boostOn ? "75 °C" : formatTemp(v.manual ? setpoint : v.target, s))
       : "—";
 
+    // The DOM is rebuilt below: keep keyboard focus on the same control.
+    const focused = focusKey(this.shadowRoot.activeElement);
     this.shadowRoot.innerHTML = `
       <style>${PALETTE}${CARD_CSS}</style>
       <ha-card class="tesy ${theme}">
@@ -648,6 +657,12 @@ class TesyBoilerCard extends Base {
 
     const svg = this.shadowRoot.querySelector(".dial svg");
     if (hasHandle) this._bindDial(svg, setpoint);
+    if (focused) {
+      const again = [...this.shadowRoot.querySelectorAll("[data-action], [role='slider']")].find(
+        (el) => focusKey(el) === focused && !el.disabled
+      );
+      again?.focus({ preventScroll: true });
+    }
   }
 
   _bindDial(svg, setpoint) {

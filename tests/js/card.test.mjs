@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   tempRole, angleFor, tempFromPoint, scheduleCalls, heaterView, deviceEntities, DAYS,
-  loadedVersion, staleAction, pickLang, cardSupported, markReloaded, errorView, numberLocale, versionCheckDue, wallClock,
+  loadedVersion, staleAction, pickLang, cardSupported, markReloaded, errorView, numberLocale, versionCheckDue, wallClock, focusKey,
 } from "../../custom_components/tesy/frontend/tesy-boiler-card.js";
 
 test("temperature roles", () => {
@@ -148,4 +148,12 @@ test("heater wall clock is read without the browser time zone", () => {
   assert.deepEqual(wallClock("2026-10-14T09:05:00"), { day: 2, hour: 9, minute: 5 }); // Wednesday
   assert.deepEqual(wallClock("2026-10-14 23:59:59"), { day: 2, hour: 23, minute: 59 });
   for (const bad of [undefined, null, "", "garbage", "2026-02-30T10:00:00", "2026-10-14T24:00:00"]) assert.equal(wallClock(bad), null);
+});
+
+test("focus key identifies a control across re-renders", () => {
+  const el = (dataset, role) => ({ dataset, getAttribute: (n) => (n === "role" ? role ?? null : null) });
+  assert.equal(focusKey(el({ action: "mode", mode: "p1" })), "mode|p1|");
+  assert.notEqual(focusKey(el({ action: "mode", mode: "p1" })), focusKey(el({ action: "mode", mode: "p2" })));
+  assert.equal(focusKey(el({}, "slider")), "||slider");
+  assert.equal(focusKey(null), null);
 });
