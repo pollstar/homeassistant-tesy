@@ -42,6 +42,7 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._posix_tz_cache: dict[str, str | None] = {}
         self._refresh_unsub = None
         self._commands_in_flight = 0
+        self._closed = False
 
         super().__init__(
             hass,
@@ -87,8 +88,18 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.async_refresh_soon()
 
     @callback
+    def async_close(self) -> None:
+        """Entry unloading: no more follow-up polls or time zone writes.
+
+        A command still running when the entry unloads would otherwise schedule
+        a poll after the unload, from a coordinator nothing uses any more.
+        """
+        self._closed = True
+        self.async_cancel_refresh()
+
+    @callback
     def async_cancel_refresh(self) -> None:
-        """Cancel a pending follow-up poll (on unload, or before a command)."""
+        """Cancel a pending follow-up poll (before a command, or on unload)."""
         if self._refresh_unsub:
             self._refresh_unsub()
             self._refresh_unsub = None
@@ -132,6 +143,8 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         one poll after the last of them.
         """
         self.async_cancel_refresh()
+        if self._closed:
+            return
 
         @callback
         def _run(_now) -> None:
@@ -183,9 +196,11 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         poll showed the right zone: it may have been changed on the panel or in
         MyTESY since. Returns True if the device was written.
         """
-        if not self.supports_timezone:
+        if self._closed or not self.supports_timezone:
             return False
         expected = await self.async_expected_timezone()
+        if self._closed:  # unloaded while the zone was being looked up
+            return False
         if expected is None:
             raise ValueError(
                 f"{self.hass.config.time_zone} cannot be expressed as a POSIX "
