@@ -77,7 +77,7 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         again once no command is in flight, so a batch (a schedule written day
         by day, however slowly) is read back once, after its last write.
         """
-        self._cancel_refresh()
+        self.async_cancel_refresh()
         self._commands_in_flight += 1
         try:
             return await self.hass.async_add_executor_job(func, *args)
@@ -87,7 +87,8 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.async_refresh_soon()
 
     @callback
-    def _cancel_refresh(self) -> None:
+    def async_cancel_refresh(self) -> None:
+        """Cancel a pending follow-up poll (on unload, or before a command)."""
         if self._refresh_unsub:
             self._refresh_unsub()
             self._refresh_unsub = None
@@ -130,7 +131,7 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         Several commands in a row (e.g. a schedule written day by day) lead to
         one poll after the last of them.
         """
-        self._cancel_refresh()
+        self.async_cancel_refresh()
 
         @callback
         def _run(_now) -> None:

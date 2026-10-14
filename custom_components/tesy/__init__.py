@@ -87,6 +87,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if coordinator.supports_card:
         _async_load_card(hass)
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+    # A follow-up poll must not outlive the entry (reload, unload).
+    entry.async_on_unload(coordinator.async_cancel_refresh)
 
     if coordinator.supports_timezone:
         # Keep the heater's time zone (it drives the weekly programs) in step

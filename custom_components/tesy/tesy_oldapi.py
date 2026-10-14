@@ -144,6 +144,9 @@ class TesyOldApi:
         _LOGGER.debug("Reset response: %s", resp)
         if str(resp.get("err", 0)) != "0":
             return {ATTR_API: "ERROR"}
+        # The counter changed: read it on the next get_data() instead of
+        # serving the cached pre-reset value for up to 10 minutes.
+        self._calc_res_cache = None
         return {ATTR_API: "OK"}
 
     def _coerce_mode(self, mode: Any) -> str:
