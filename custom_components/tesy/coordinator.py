@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+import asyncio
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .features import FEATURE_CARD, FEATURE_SCHEDULE, FEATURE_TIMEZONE, device_features
 from .tesy import Tesy
@@ -43,6 +45,9 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._refresh_unsub = None
         self._commands_in_flight = 0
         self._closed = False
+        self._tz_lock = asyncio.Lock()
+        # When the last _all reply arrived: its date is the heater clock then.
+        self.data_received_at: datetime | None = None
 
         super().__init__(
             hass,
@@ -65,7 +70,9 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # Async update Data
     async def _async_update_data(self) -> dict[str, Any]:
         """Get new sensor data for Tesy component."""
-        return await self.hass.async_add_executor_job(self._get_data)
+        data = await self.hass.async_add_executor_job(self._get_data)
+        self.data_received_at = dt_util.utcnow()
+        return data
 
     async def _async_command(self, func, *args) -> Any:
         """Send a command to the heater and read its state back soon after.
@@ -196,6 +203,12 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         poll showed the right zone: it may have been changed on the panel or in
         MyTESY since. Returns True if the device was written.
         """
+        # One sync at a time: two HA zone changes in a row must not race, the
+        # last one wins. The zone is looked up again inside the lock.
+        async with self._tz_lock:
+            return await self._async_sync_timezone_locked(force)
+
+    async def _async_sync_timezone_locked(self, force: bool) -> bool:
         if self._closed or not self.supports_timezone:
             return False
         expected = await self.async_expected_timezone()

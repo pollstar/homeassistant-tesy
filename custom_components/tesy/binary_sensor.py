@@ -60,6 +60,15 @@ class TesyClockProblemSensor(TesyEntity, BinarySensorEntity):
     # Change on every poll; keep them out of history.
     _unrecorded_attributes = frozenset({"device_time", "offset_seconds"})
 
+    def _reference_time(self):
+        """HA local time when the heater reported its date (last poll).
+
+        Comparing the snapshot with the current time would make a healthy clock
+        look late by the age of the data, up to a whole poll interval.
+        """
+        received = self.coordinator.data_received_at
+        return dt_util.as_local(received) if received else dt_util.now()
+
     @property
     def is_on(self) -> bool:
         """Return True if there is a clock problem."""
@@ -67,7 +76,7 @@ class TesyClockProblemSensor(TesyEntity, BinarySensorEntity):
             clock_problems(
                 self.coordinator.data,
                 self.coordinator.expected_timezone,
-                dt_util.now(),
+                self._reference_time(),
             )
         )
 
@@ -75,7 +84,7 @@ class TesyClockProblemSensor(TesyEntity, BinarySensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return clock details."""
         data = self.coordinator.data
-        now = dt_util.now()
+        now = self._reference_time()
         device = device_time(data)
         offset = clock_offset(data, now)
         expected = self.coordinator.expected_timezone
