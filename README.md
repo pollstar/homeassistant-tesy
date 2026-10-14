@@ -76,7 +76,7 @@ auto_reload: true   # reload a page that still runs an older card after an updat
 - Heating status (heating / target reached / heating off / off) with a subtle animation while the element heats.
 - **Schedule** dialog: P1–P3 as a 7×24 grid on wide screens, day by day on phones and portrait screens. Paint hours with a 15–75 °C brush or ❄ (heating off), copy a day to other days, then write to the heater. The dialog follows changes made elsewhere while nothing is edited.
 - **Statistics** dialog: energy, errors, Wi-Fi, uptime, firmware, clock state.
-- Follows the Home Assistant light/dark theme; English, Russian and Ukrainian.
+- Follows the Home Assistant light/dark theme and UI language: English, Russian and Ukrainian; any other language gets English (numbers keep the UI language format).
 
 Related entities (Boost switch, energy and diagnostic sensors, clock sensor, time zone button) are found automatically on the same device.
 

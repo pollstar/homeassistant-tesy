@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   tempRole, angleFor, tempFromPoint, scheduleCalls, heaterView, deviceEntities, DAYS,
-  loadedVersion, staleAction,
+  loadedVersion, staleAction, pickLang,
 } from "../../custom_components/tesy/frontend/tesy-boiler-card.js";
 
 test("temperature roles", () => {
@@ -83,4 +83,15 @@ test("stale page detection reloads once, then shows a banner", () => {
   assert.equal(staleAction("aaaa", "bbbb", null), "reload");
   assert.equal(staleAction("aaaa", "bbbb", "bbbb"), "banner"); // already reloaded for this version
   assert.equal(staleAction("aaaa", "cccc", "bbbb"), "reload"); // newer update again
+});
+
+test("card language follows the HA UI language, English otherwise", () => {
+  assert.equal(pickLang("ru"), "ru");
+  assert.equal(pickLang("uk"), "uk");
+  assert.equal(pickLang("en-GB"), "en");
+  assert.equal(pickLang("uk_UA"), "uk");
+  assert.equal(pickLang("de"), "en");
+  assert.equal(pickLang("zh-Hans"), "en");
+  assert.equal(pickLang(undefined), "en");
+  assert.equal(pickLang("constructor"), "en");
 });

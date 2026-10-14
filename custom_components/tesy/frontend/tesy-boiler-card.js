@@ -10,7 +10,7 @@
  *   entity: water_heater.boiler_modeco_2_heater
  */
 
-export const CARD_VERSION = "0.1.5";
+export const CARD_VERSION = "0.1.6";
 
 export const DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 export const MODES = ["performance", "p1", "p2", "p3", "eco", "ec2", "ec3"];
@@ -106,9 +106,16 @@ const STRINGS = {
   },
 };
 
+/** Card language: the Home Assistant UI language if translated, else English. */
+export function pickLang(language) {
+  const code = String(language || "").toLowerCase().split(/[-_]/)[0];
+  return Object.prototype.hasOwnProperty.call(STRINGS, code) ? code : "en";
+}
+
+const uiLanguage = (hass) => hass?.locale?.language || hass?.language;
+
 function strings(hass) {
-  const lang = (hass && (hass.locale?.language || hass.language)) || "en";
-  return STRINGS[lang.slice(0, 2)] || STRINGS.en;
+  return STRINGS[pickLang(uiLanguage(hass))];
 }
 
 const fmt = (s, vars) => s.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
@@ -331,7 +338,7 @@ function formatTemp(t, s) {
 
 function formatCurrent(t, hass) {
   if (t === null || t === undefined || Number.isNaN(t)) return "—";
-  return new Intl.NumberFormat(hass?.locale?.language || "en", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(t);
+  return new Intl.NumberFormat(uiLanguage(hass) || "en", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(t);
 }
 
 // ---------------------------------------------------------------- the card
@@ -383,6 +390,7 @@ class TesyBoilerCard extends Base {
   _changed(old, hass) {
     const ids = [this._config?.entity, ...Object.values(this._ents || {}).filter((v) => typeof v === "string")];
     if (old.themes?.darkMode !== hass.themes?.darkMode) return true;
+    if (uiLanguage(old) !== uiLanguage(hass)) return true;
     return ids.some((id) => old.states[id] !== hass.states[id]);
   }
 
@@ -672,7 +680,8 @@ class TesyBoilerDialog extends Base {
       else if (!this._dirtyDays().length && !this._st.saving) this._syncSchedule();
     }
     const ids = [this._config.entity, ...Object.values(this._ents).filter((v) => typeof v === "string")];
-    if (!old || old.themes?.darkMode !== hass.themes?.darkMode || ids.some((id) => old.states[id] !== hass.states[id])) {
+    if (!old || old.themes?.darkMode !== hass.themes?.darkMode || uiLanguage(old) !== uiLanguage(hass)
+        || ids.some((id) => old.states[id] !== hass.states[id])) {
       this._render();
     }
   }
@@ -775,7 +784,7 @@ class TesyBoilerDialog extends Base {
       const o = st(id);
       if (!o || o.state === "unavailable" || o.state === "unknown") return "—";
       const n = Number(o.state);
-      return Number.isNaN(n) ? o.state : new Intl.NumberFormat(this._hass.locale?.language || "en", { maximumFractionDigits: digits }).format(n);
+      return Number.isNaN(n) ? o.state : new Intl.NumberFormat(uiLanguage(this._hass) || "en", { maximumFractionDigits: digits }).format(n);
     };
     const err = st(this._ents.error_status)?.state;
     const errOk = !err || err === "00" || err === "0";
