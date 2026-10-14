@@ -65,50 +65,55 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Get new sensor data for Tesy component."""
         return await self.hass.async_add_executor_job(self._get_data)
 
+    async def _async_command(self, func, *args) -> Any:
+        """Send a command to the heater and read its state back soon after.
+
+        The reply only echoes the written field; the heating state, active
+        target, device time and the like follow on the next poll. Every command
+        goes through here, so none of them waits for the regular poll.
+        """
+        try:
+            return await self.hass.async_add_executor_job(func, *args)
+        finally:
+            self.async_refresh_soon()
+
     # Set target temperature in manual mode
     async def async_set_target_temperature(self, val: int) -> None:
         """Set target temperature for Tesy component."""
-        return await self.hass.async_add_executor_job(
-            self._client.set_target_temperature, val
-        )
+        return await self._async_command(self._client.set_target_temperature, val)
 
     # Turn power ON/OFF
     async def async_set_power(self, val: str) -> None:
         """Set power for Tesy component."""
-        return await self.hass.async_add_executor_job(self._client.set_power, val)
+        return await self._async_command(self._client.set_power, val)
 
     # Turn boost ON/OFF
     async def async_set_boost(self, val: str) -> None:
         """Set boost for Tesy component."""
-        return await self.hass.async_add_executor_job(self._client.set_boost, val)
+        return await self._async_command(self._client.set_boost, val)
 
     # Turn operation mode
     async def async_set_operation_mode(self, val: str) -> None:
         """Set mode for Tesy component."""
-        return await self.hass.async_add_executor_job(
-            self._client.set_operation_mode, val
-        )
+        return await self._async_command(self._client.set_operation_mode, val)
 
     # Set child lock
     async def async_set_child_lock(self, val: str) -> None:
         """Set child lock for Tesy component."""
-        return await self.hass.async_add_executor_job(self._client.set_child_lock, val)
+        return await self._async_command(self._client.set_child_lock, val)
 
     async def async_set_schedule(self, key: str, val: str) -> dict[str, Any]:
         """Write one day of a weekly program."""
         if self.is_old_api:
             raise NotImplementedError("Schedules are not supported by the old API")
-        return await self.hass.async_add_executor_job(
-            self._client.set_schedule, key, val
-        )
+        return await self._async_command(self._client.set_schedule, key, val)
 
     @callback
     def async_refresh_soon(self, delay: float = 2.0) -> None:
-        """Poll the heater shortly after a command.
+        """Poll the heater shortly after a command (debounced).
 
-        The command reply only echoes the written field; heating state (ht),
-        the active target (tmpR) and the like follow on the next poll, which
-        would otherwise be up to UPDATE_INTERVAL seconds away.
+        Several commands in a row (e.g. a schedule written day by day) lead to
+        one poll after the last of them.
         """
         if self._refresh_unsub:
             self._refresh_unsub()
@@ -171,9 +176,8 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self.data.get(TZ_FIELD) == expected:
             return False
 
-        response = await self.hass.async_add_executor_job(
-            self._client.set_timezone, expected
-        )
+        # The follow-up poll also brings the device time (date) in the new zone.
+        response = await self._async_command(self._client.set_timezone, expected)
         if response.get(ATTR_API) != "OK" or response.get(TZ_FIELD) != expected:
             raise ConnectionError(f"Heater rejected time zone {expected}: {response}")
 
@@ -186,7 +190,7 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_reset_energy_counter(self) -> dict[str, Any]:
         """Reset the resettable energy counter."""
-        return await self.hass.async_add_executor_job(self._client.reset_energy_counter)
+        return await self._async_command(self._client.reset_energy_counter)
 
     def _get_data(self) -> dict[str, Any]:
         """Get new sensor data using Tesy API."""
