@@ -9,6 +9,8 @@ This fork by [Pavel Starovoitov (@pollstar)](https://github.com/pollstar) builds
 - **Clock and time zone sync** with Home Assistant, so programs switch at the right hour.
 - **Configurable poll interval** and an immediate re-read after every command, so changes made on the heater panel or in MyTESY show up quickly.
 
+<img src="https://raw.githubusercontent.com/pollstar/homeassistant-tesy/modeco2-weekly-programs/docs/card.png" alt="Tesy boiler card, dark and light theme" width="720">
+
 ## Supported devices
 
 Water heaters with the ESP32 Wi-Fi module (black PCB) and its local API at `http://<heater-ip>/api`. Older devices with an Atheros AR9331 module use a different API; enable *Use old API* in the setup dialog for them (basic control only), or replace the module with the ESP32 one.
