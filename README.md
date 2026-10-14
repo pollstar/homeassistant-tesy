@@ -109,7 +109,7 @@ The chart button opens energy and diagnostics.
 
 <img src="https://raw.githubusercontent.com/pollstar/homeassistant-tesy/modeco2-weekly-programs/docs/statistics.png" alt="Energy and diagnostics dialog" width="420">
 
-- **Energy**: total consumption and the resettable counter (since its last reset), plus the heating element run time. The heater updates its own counter in hourly batches; for the Energy dashboard the integration adds heating time × configured power at every poll.
+- **Energy**: total consumption and the resettable counter (since its last reset). The heater updates its own counter in hourly batches; for the Energy dashboard the integration adds heating time × configured power at every poll.
 - **Errors**: current error code with a description (E01/E02 lower sensor open/short, E03/E04 upper sensor open/short).
 - **Wi-Fi** signal in dBm, marked *weak* below −67 dBm.
 - **Module uptime**, **clock** state (heater time and time zone compared with Home Assistant) and **firmware** versions.

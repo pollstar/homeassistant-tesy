@@ -10,7 +10,7 @@
  *   entity: water_heater.boiler_modeco_2_heater
  */
 
-export const CARD_VERSION = "0.1.8";
+export const CARD_VERSION = "0.1.9";
 
 export const DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 export const MODES = ["performance", "p1", "p2", "p3", "eco", "ec2", "ec3"];
@@ -226,6 +226,19 @@ export function cardSupported(stateObj) {
   if (Array.isArray(features)) return features.includes("card");
   if (stateObj.state === "unavailable" || stateObj.state === "unknown") return null;
   return false;
+}
+
+/**
+ * Error sensor state -> what the statistics dialog shows: "ok" for 00, the
+ * code for a fault, "unknown" when there is no data (no sensor, unavailable).
+ */
+export function errorView(state) {
+  if (state === undefined || state === null || state === "" || state === "unavailable" || state === "unknown") {
+    return { kind: "unknown", code: null };
+  }
+  const code = String(state).trim();
+  if (/^0+$/.test(code)) return { kind: "ok", code: "00" };
+  return { kind: "error", code: code.padStart(2, "0") };
 }
 
 export function heaterView(stateObj, boostOn) {
@@ -879,8 +892,12 @@ class TesyBoilerDialog extends Base {
       const n = Number(o.state);
       return Number.isNaN(n) ? o.state : new Intl.NumberFormat(uiLanguage(this._hass) || "en", { maximumFractionDigits: digits }).format(n);
     };
-    const err = st(this._ents.error_status)?.state;
-    const errOk = !err || err === "00" || err === "0";
+    const err = errorView(st(this._ents.error_status)?.state);
+    const errPill = {
+      ok: ["ok", `${esc(s.none)} · 00`],
+      error: ["warm", `E${esc(err.code)}`],
+      unknown: ["neutral", "—"],
+    }[err.kind];
     const rssi = Number(st(this._ents.wifi_signal)?.state);
     const up = Number(st(this._ents.uptime)?.state);
     const upText = Number.isNaN(up) ? "—" : `${Math.floor(up / 3600)} ${s.h} ${Math.floor((up % 3600) / 60)} ${s.min}`;
@@ -892,7 +909,7 @@ class TesyBoilerDialog extends Base {
         <div class="kpi"><div class="k">${esc(s.energyReset)}</div><div class="v num">${val(this._ents.energy_consumed_resettable)}<span> ${esc(s.kwh)}</span></div></div>
       </div>
       <div class="rows">
-        <div class="row"><span>${esc(s.errors)}</span><span class="pill ${errOk ? "ok" : "warm"}">${errOk ? esc(s.none) + " · 00" : "E" + esc(err)}</span></div>
+        <div class="row"><span>${esc(s.errors)}</span><span class="pill ${errPill[0]}">${errPill[1]}</span></div>
         <div class="row"><span>${esc(s.wifi)}</span><span class="num ${rssi < -67 ? "warmtxt" : ""}">${Number.isNaN(rssi) ? "—" : rssi + " dBm" + (rssi < -67 ? " · " + esc(s.weak) : "")}</span></div>
         <div class="row"><span>${esc(s.uptime)}</span><span class="num">${esc(upText)}</span></div>
         ${this._ents.clock_problem ? `<div class="row"><span>${esc(s.clockRow)}</span><span class="${clockBad ? "warmtxt" : ""}">${esc(clockBad ? s.clockProblem : s.ok)}</span></div>` : ""}
@@ -1107,6 +1124,7 @@ const DIALOG_CSS = `
   .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
   .pill.ok { background: var(--t-ok-bg); color: var(--t-ok-fg); }
   .pill.warm { background: var(--t-warm-bg); color: var(--t-warm-fg); }
+  .pill.neutral { background: var(--t-surface-2); color: var(--t-muted); }
   .warmtxt { color: var(--t-warm-fg); } .errtxt { color: var(--error-color, #db4437); }
   /* stats */
   .kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }

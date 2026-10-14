@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   tempRole, angleFor, tempFromPoint, scheduleCalls, heaterView, deviceEntities, DAYS,
-  loadedVersion, staleAction, pickLang, cardSupported, markReloaded,
+  loadedVersion, staleAction, pickLang, cardSupported, markReloaded, errorView,
 } from "../../custom_components/tesy/frontend/tesy-boiler-card.js";
 
 test("temperature roles", () => {
@@ -113,4 +113,12 @@ test("reload marker: no reload loop when storage is blocked", () => {
   assert.equal(markReloaded(blocked, "abc"), false);
   const ignored = { setItem: () => {}, getItem: () => null }; // e.g. a no-op storage
   assert.equal(markReloaded(ignored, "abc"), false);
+});
+
+test("error sensor: no data is not a fault", () => {
+  for (const s of [undefined, null, "", "unavailable", "unknown"]) assert.deepEqual(errorView(s), { kind: "unknown", code: null });
+  assert.deepEqual(errorView("00"), { kind: "ok", code: "00" });
+  assert.deepEqual(errorView("0"), { kind: "ok", code: "00" });
+  assert.deepEqual(errorView("03"), { kind: "error", code: "03" });
+  assert.deepEqual(errorView("3"), { kind: "error", code: "03" });
 });
