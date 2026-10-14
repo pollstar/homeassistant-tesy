@@ -59,6 +59,9 @@ class ScheduleCodecTest(TestCase):
             schedule.encode_day([80] + [50] * 23)
         with self.assertRaises(ValueError):
             schedule.decode_day("0E0E")
+        with self.assertRaises(ValueError):
+            # 48 chars, but fromhex skips the spaces: only 23 bytes
+            schedule.decode_day("0E" * 23 + "  ")
 
     def test_schedule_key(self):
         self.assertEqual(schedule.schedule_key(3, "mo"), "prgP3MO")
@@ -100,6 +103,14 @@ class ActiveTargetTest(TestCase):
     def test_device_without_programs_falls_back_to_tmp_r(self):
         # Old API data has no prg fields; keep the previous behaviour.
         self.assertEqual(schedule.active_target({"mode": "1", "tmpR": "55"}), 55.0)
+
+    def test_powered_off_runs_no_program(self):
+        data = device_data(mode="1", tmp_r="9")
+        data["pwr"] = "0"
+        self.assertIsNone(schedule.active_program(data))
+        self.assertEqual(schedule.active_target(data), 9.0)
+        data["pwr"] = "1"
+        self.assertEqual(schedule.active_program(data), 1)
 
     def test_unverified_model_keeps_tmp_r(self):
         # Programs reported, but not enabled for the model: basic behaviour.

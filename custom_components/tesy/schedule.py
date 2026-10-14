@@ -49,7 +49,9 @@ def decode_day(value: str) -> list[int | None]:
     """Decode a 48-char hex day into 24 hourly temperatures (None = empty)."""
     if not isinstance(value, str) or len(value) != HOURS_PER_DAY * 2:
         raise ValueError(f"Invalid schedule value: {value!r}")
-    raw = bytes.fromhex(value)
+    raw = bytes.fromhex(value)  # ValueError on bad hex
+    if len(raw) != HOURS_PER_DAY:  # fromhex skips whitespace
+        raise ValueError(f"Invalid schedule value: {value!r}")
     return [None if byte == EMPTY_SLOT else byte for byte in raw]
 
 
@@ -126,6 +128,8 @@ def scheduled_target(
 
 def active_program(data: dict[str, Any]) -> int | None:
     """Return the program number the device is running, or None."""
+    if str(data.get("pwr")) == "0":
+        return None  # powered off: the mode is kept but nothing runs
     return PROGRAM_MODES.get(str(data.get("mode")))
 
 

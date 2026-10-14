@@ -65,6 +65,7 @@ SET_SCHEDULE_SCHEMA = {
     vol.Required(ATTR_PROGRAM): vol.All(vol.Coerce(int), vol.In(PROGRAMS)),
     vol.Optional(ATTR_DAYS, default=[day.lower() for day in DAYS]): vol.All(
         cv.ensure_list,
+        vol.Length(min=1, max=len(DAYS)),
         [vol.All(cv.string, vol.Lower, vol.In([d.lower() for d in DAYS]))],
     ),
     vol.Required(ATTR_TEMPERATURES): vol.All(

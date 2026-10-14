@@ -10,29 +10,35 @@ features = module_from_spec(_SPEC)
 _SPEC.loader.exec_module(features)
 
 ALL = {features.FEATURE_SCHEDULE, features.FEATURE_TIMEZONE, features.FEATURE_CARD}
+PROGRAMS = {
+    "id": "2004",
+    "tz": "EET-2EEST,M3.5.0/3,M10.5.0/4",
+    **{f"prgP{p}{d}": "FF" * 24 for p in (1, 2, 3) for d in features._DAYS},
+}
 
 
 class DeviceFeaturesTest(TestCase):
     def test_modeco2_gets_everything(self):
-        data = {
-            "id": "2004",
-            "prgP1MO": "FF" * 24,
-            "tz": "EET-2EEST,M3.5.0/3,M10.5.0/4",
-        }
-        self.assertEqual(features.device_features(data), ALL)
+        self.assertEqual(features.device_features(PROGRAMS), ALL)
 
     def test_other_models_get_nothing(self):
         # Same fields, but the model is not verified: basic behaviour.
         for model in ("2000", "2002", "2003", "2005", None):
-            data = {"id": model, "prgP1MO": "FF" * 24, "tz": "UTC0"}
+            data = {**PROGRAMS, "id": model}
             self.assertEqual(features.device_features(data), frozenset(), model)
 
     def test_missing_fields_disable_their_feature(self):
         self.assertEqual(
-            features.device_features({"id": "2004"}), {features.FEATURE_CARD}
+            features.device_features({"id": 2004}), {features.FEATURE_CARD}
         )
         self.assertEqual(
             features.device_features({"id": 2004, "tz": "UTC0"}),
+            {features.FEATURE_TIMEZONE, features.FEATURE_CARD},
+        )
+        # All 21 program days are needed, not just the first one.
+        partial = {k: v for k, v in PROGRAMS.items() if k != "prgP3SU"}
+        self.assertEqual(
+            features.device_features(partial),
             {features.FEATURE_TIMEZONE, features.FEATURE_CARD},
         )
 
