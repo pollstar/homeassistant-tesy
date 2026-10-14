@@ -173,7 +173,9 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         expected = await self.async_expected_timezone()
         if expected is None:
             raise ValueError(
-                f"No POSIX time zone found for {self.hass.config.time_zone}"
+                f"{self.hass.config.time_zone} cannot be expressed as a POSIX "
+                "time zone for the heater (no rule string, or it does not match "
+                "the zone's coming changes); set the clock on the heater panel"
             )
         if not force and self.data.get(TZ_FIELD) == expected:
             return False

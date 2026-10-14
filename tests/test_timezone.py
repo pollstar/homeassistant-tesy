@@ -67,3 +67,61 @@ class ClockProblemTest(TestCase):
         self.assertEqual(tz.clock_problems({}, KYIV, LOCAL_NOW), [])
         self.assertEqual(tz.clock_problems(data(), None, LOCAL_NOW), [])
         self.assertIsNone(tz.clock_offset({"date": "garbage"}, LOCAL_NOW))
+
+
+class PosixEvaluationTest(TestCase):
+    """The POSIX string is checked against the tz database before a sync."""
+
+    def test_offsets_around_transitions(self):
+        utc = dt_timezone.utc
+        # Kyiv: EEST until 2026-10-25 01:00 UTC (04:00 local), then EET.
+        self.assertEqual(
+            tz.posix_utcoffset(KYIV, datetime(2026, 10, 25, 0, 59, tzinfo=utc)), 10800
+        )
+        self.assertEqual(
+            tz.posix_utcoffset(KYIV, datetime(2026, 10, 25, 1, 0, tzinfo=utc)), 7200
+        )
+        # Back to EEST on 2027-03-28 01:00 UTC (03:00 local).
+        self.assertEqual(
+            tz.posix_utcoffset(KYIV, datetime(2027, 3, 28, 0, 59, tzinfo=utc)), 7200
+        )
+        self.assertEqual(
+            tz.posix_utcoffset(KYIV, datetime(2027, 3, 28, 1, 0, tzinfo=utc)), 10800
+        )
+        sydney = "AEST-10AEDT,M10.1.0,M4.1.0/3"  # DST spans the new year
+        self.assertEqual(
+            tz.posix_utcoffset(sydney, datetime(2027, 1, 15, tzinfo=utc)), 39600
+        )
+        self.assertEqual(
+            tz.posix_utcoffset(sydney, datetime(2027, 6, 15, tzinfo=utc)), 36000
+        )
+        self.assertEqual(
+            tz.posix_utcoffset("IST-5:30", datetime(2027, 6, 15, tzinfo=utc)), 19800
+        )
+        self.assertIsNone(
+            tz.posix_utcoffset("garbage!", datetime(2027, 6, 15, tzinfo=utc))
+        )
+
+    def test_string_must_match_the_zone(self):
+        start = datetime(2026, 10, 14, 10, 0, tzinfo=dt_timezone.utc)
+        self.assertTrue(tz.posix_matches_zone(KYIV, "Europe/Kyiv", start))
+        # A fixed offset for a zone with DST changes is rejected...
+        self.assertFalse(tz.posix_matches_zone("EET-2", "Europe/Kyiv", start))
+        # ...as are rules that disagree with the zone (US dates for Europe).
+        self.assertFalse(
+            tz.posix_matches_zone("EET-2EEST,M3.2.0,M11.1.0", "Europe/Kyiv", start)
+        )
+        self.assertFalse(tz.posix_matches_zone(KYIV, "No/Such_Zone", start))
+
+    def test_whole_tz_database_resolves(self):
+        start = datetime(2026, 10, 14, 10, 0, tzinfo=dt_timezone.utc)
+        for name in (
+            "Europe/Kyiv",
+            "America/New_York",
+            "Australia/Sydney",
+            "America/Nuuk",
+            "Asia/Gaza",
+            "America/Santiago",
+        ):
+            with self.subTest(name=name):
+                self.assertIsNotNone(tz.posix_tz_for(name, start))

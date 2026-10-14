@@ -92,3 +92,6 @@ class Tesy:
             raise ConnectionError from connection_error
         except requests.exceptions.HTTPError as http_error:
             raise ConnectionError from http_error
+        except requests.exceptions.RequestException as request_error:
+            # Read timeouts and the like: callers handle ConnectionError only.
+            raise ConnectionError from request_error
