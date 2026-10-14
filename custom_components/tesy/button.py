@@ -89,6 +89,6 @@ class TesySyncTimezoneButton(TesyEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Handle the button press."""
         try:
-            await self.coordinator.async_sync_timezone()
+            await self.coordinator.async_sync_timezone(force=True)
         except (ConnectionError, ValueError) as err:
             raise HomeAssistantError(f"Failed to sync the time zone: {err}") from err

@@ -161,10 +161,12 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
         return self._posix_tz_cache[name]
 
-    async def async_sync_timezone(self) -> bool:
+    async def async_sync_timezone(self, force: bool = False) -> bool:
         """Write Home Assistant's time zone to the device if it differs.
 
-        Returns True if the device was changed.
+        With force (the Sync time zone button) it is written even if the last
+        poll showed the right zone: it may have been changed on the panel or in
+        MyTESY since. Returns True if the device was written.
         """
         if not self.supports_timezone:
             return False
@@ -173,7 +175,7 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise ValueError(
                 f"No POSIX time zone found for {self.hass.config.time_zone}"
             )
-        if self.data.get(TZ_FIELD) == expected:
+        if not force and self.data.get(TZ_FIELD) == expected:
             return False
 
         # The follow-up poll also brings the device time (date) in the new zone.
