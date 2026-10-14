@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   tempRole, angleFor, tempFromPoint, scheduleCalls, heaterView, deviceEntities, DAYS,
-  loadedVersion, staleAction, pickLang, cardSupported, markReloaded, errorView, numberLocale,
+  loadedVersion, staleAction, pickLang, cardSupported, markReloaded, errorView, numberLocale, versionCheckDue,
 } from "../../custom_components/tesy/frontend/tesy-boiler-card.js";
 
 test("temperature roles", () => {
@@ -129,4 +129,15 @@ test("number locale accepts HA language codes", () => {
   assert.equal(numberLocale("en-GB"), "en-GB");
   for (const bad of [undefined, "", "not a locale!", "x_"]) assert.equal(numberLocale(bad), "en");
   assert.doesNotThrow(() => new Intl.NumberFormat(numberLocale("uk_UA")).format(42.5));
+});
+
+test("version is rechecked after a reconnect and every 10 minutes", () => {
+  const hass = { callApi() {}, connected: true };
+  const t0 = 1_000_000;
+  assert.equal(versionCheckDue(undefined, hass, 0, t0), true); // first hass
+  assert.equal(versionCheckDue(hass, hass, t0, t0 + 1000), false);
+  assert.equal(versionCheckDue({ ...hass, connected: false }, hass, t0, t0 + 1000), true); // reconnected
+  assert.equal(versionCheckDue(hass, { ...hass, connected: false }, t0, t0 + 1000), false); // offline now
+  assert.equal(versionCheckDue(hass, hass, t0, t0 + 10 * 60 * 1000), true);
+  assert.equal(versionCheckDue(undefined, {}, 0, t0), false); // no API
 });

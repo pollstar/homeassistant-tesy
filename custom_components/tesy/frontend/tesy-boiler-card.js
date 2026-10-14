@@ -10,7 +10,7 @@
  *   entity: water_heater.boiler_modeco_2_heater
  */
 
-export const CARD_VERSION = "0.1.11";
+export const CARD_VERSION = "0.1.12";
 
 export const DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 export const MODES = ["performance", "p1", "p2", "p3", "eco", "ec2", "ec3"];
@@ -291,8 +291,40 @@ export function staleAction(loaded, server, reloadedFor) {
 
 const RELOAD_KEY = "tesy-boiler-card-reloaded-for";
 const LOADED_VERSION = loadedVersion(import.meta.url);
-let serverVersion = null; // one request per page, shared by all cards
+const VERSION_RECHECK_MS = 10 * 60 * 1000;
+let versionRequest = null; // the request in flight, shared by all cards
+let serverVersion = null; // last version the server reported
+let serverVersionAt = 0;
 let reloading = false;
+
+/**
+ * When a card should ask the server for its version: on its first hass, after
+ * Home Assistant reconnects (it may have restarted with a new card), and at
+ * most every 10 minutes otherwise.
+ */
+export function versionCheckDue(old, hass, lastCheck, now) {
+  if (!hass?.callApi) return false;
+  if (!old) return true;
+  if (old.connected === false && hass.connected !== false) return true;
+  return now - lastCheck >= VERSION_RECHECK_MS;
+}
+
+function fetchServerVersion(hass, fresh) {
+  if (versionRequest) return versionRequest;
+  if (!fresh && serverVersion && Date.now() - serverVersionAt < VERSION_RECHECK_MS) {
+    return Promise.resolve(serverVersion);
+  }
+  versionRequest = hass
+    .callApi("GET", "tesy/card_version")
+    .then((r) => r?.version ?? null)
+    .catch(() => null) // restarting, or an older integration without the endpoint
+    .then((version) => {
+      versionRequest = null;
+      if (version) { serverVersion = version; serverVersionAt = Date.now(); }
+      return version || serverVersion;
+    });
+  return versionRequest;
+}
 
 /**
  * Remember that the page was reloaded for this server version. Returns false
@@ -321,14 +353,8 @@ function readReloaded(storage) {
  * auto_reload: one that allows it reloads the page (once per server version),
  * the others show the banner.
  */
-async function checkVersion(hass, autoReload) {
-  if (!serverVersion) {
-    serverVersion = hass
-      .callApi("GET", "tesy/card_version")
-      .then((r) => r?.version ?? null)
-      .catch(() => null); // older integration without the endpoint
-  }
-  const server = await serverVersion;
+async function checkVersion(hass, autoReload, fresh) {
+  const server = await fetchServerVersion(hass, fresh);
   let storage = null;
   try { storage = window.sessionStorage; } catch (e) { /* storage blocked */ }
   const action = staleAction(LOADED_VERSION, server, storage ? readReloaded(storage) : null);
@@ -436,8 +462,12 @@ class TesyBoilerCard extends Base {
     const old = this._hass;
     this._hass = hass;
     if (this._dialog) this._dialog.hass = hass;
-    if (!old && hass?.callApi) {
-      checkVersion(hass, this._config?.auto_reload !== false).then((r) => {
+    const now = Date.now();
+    if (versionCheckDue(old, hass, this._versionAt || 0, now)) {
+      // After a reconnect ask the server again, whatever was cached.
+      const fresh = !!old && old.connected === false;
+      this._versionAt = now;
+      checkVersion(hass, this._config?.auto_reload !== false, fresh).then((r) => {
         if (r !== "ok" && !this._stale) { this._stale = true; this._render(); }
       });
     }
