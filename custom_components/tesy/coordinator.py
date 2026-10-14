@@ -47,6 +47,9 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._closed = False
         self._refresh_task: asyncio.Task | None = None
         self._tz_lock = asyncio.Lock()
+        # One request to the heater at a time: polls and commands never overlap,
+        # so a read started before a write cannot report the pre-write state.
+        self._io_lock = asyncio.Lock()
         # When the last _all reply arrived: its date is the heater clock then.
         self.data_received_at: datetime | None = None
 
@@ -71,8 +74,9 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # Async update Data
     async def _async_update_data(self) -> dict[str, Any]:
         """Get new sensor data for Tesy component."""
-        data = await self.hass.async_add_executor_job(self._get_data)
-        self.data_received_at = dt_util.utcnow()
+        async with self._io_lock:
+            data = await self.hass.async_add_executor_job(self._get_data)
+            self.data_received_at = dt_util.utcnow()
         return data
 
     async def _async_command(self, func, *args) -> Any:
@@ -89,7 +93,8 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.async_cancel_refresh()
         self._commands_in_flight += 1
         try:
-            return await self.hass.async_add_executor_job(func, *args)
+            async with self._io_lock:
+                return await self.hass.async_add_executor_job(func, *args)
         finally:
             self._commands_in_flight -= 1
             if not self._commands_in_flight:
