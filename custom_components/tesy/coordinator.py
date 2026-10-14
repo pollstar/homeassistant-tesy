@@ -97,6 +97,8 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._commands_in_flight += 1
         try:
             async with self._io_lock:
+                if self._closed:  # unloading began while this waited its turn
+                    raise ConnectionError("The Tesy integration is unloading")
                 return await self.hass.async_add_executor_job(func, *args)
         finally:
             self._commands_in_flight -= 1
@@ -176,7 +178,10 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         def _run(_now) -> None:
             self._refresh_unsub = None
             if not self._closed:
-                self.hass.async_create_task(self.async_request_refresh())
+                # async_refresh, not async_request_refresh: this timer already
+                # batches commands; the coordinator's 10 s request debounce on
+                # top would delay a second command's readback.
+                self.hass.async_create_task(self.async_refresh())
 
         self._refresh_unsub = async_call_later(self.hass, delay, _run)
 
