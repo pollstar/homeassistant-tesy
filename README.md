@@ -192,7 +192,7 @@ The integration talks to `http://<heater-ip>/api`. Everything is read with one r
 | `pwr` | Power | `0` / `1` |
 | `mode` | Operation mode (see above) | `0`–`6` |
 | `tmpT` | Manual setpoint | `15`–`75` |
-| `tmpR` | Active target (placeholder `9` while a program runs without Boost) | — |
+| `tmpR` | Active target; in a weekly program it may already be the next hour's value (heating ahead), or a placeholder `9` while the heater is idle | — |
 | `tmpC` | Water temperature / showers | — |
 | `ht` | Heating element on | — |
 | `bst` | Boost | `0` / `1` |

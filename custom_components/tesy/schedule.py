@@ -152,20 +152,27 @@ def active_target(
 ) -> float | None:
     """Return the target the device is working towards right now.
 
-    ``tmpR`` holds it in manual and Eco modes and while Boost is active. While a
-    weekly program runs without Boost, the ModEco 2 (id 2004) firmware reports a
-    placeholder there (``9``), so the value is taken from the program for the
-    current hour instead. With use_schedule False (models without verified
-    program support) ``tmpR`` is returned as is.
+    ``tmpR`` holds it in every mode, including a weekly program, where it may
+    already be the next hour's value while the heater warms up ahead of it.
+    While a program runs and the heater is idle, the ModEco 2 (id 2004)
+    firmware reports a placeholder below the slot range instead (``9``); the
+    target is then taken from the program for the current hour. With
+    use_schedule False (models without verified program support) ``tmpR`` is
+    returned as is.
     """
-    program = active_program(data)
-    boost = str(data.get("bst")) == "1"
-    if program is not None and not boost and use_schedule and has_schedules(data):
-        target = scheduled_target(data, program, now)
-        return None if target is None else float(target)
-
     value = data.get("tmpR")
     try:
-        return float(value)
+        reported = float(value)
     except (TypeError, ValueError):
-        return None
+        reported = None
+
+    program = active_program(data)
+    if (
+        program is not None
+        and use_schedule
+        and has_schedules(data)
+        and (reported is None or reported < MIN_SLOT_TEMP)
+    ):
+        target = scheduled_target(data, program, now)
+        return None if target is None else float(target)
+    return reported

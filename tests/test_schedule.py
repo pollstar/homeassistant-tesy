@@ -103,6 +103,21 @@ class ActiveTargetTest(TestCase):
         data.update({"bst": "0", "tmpR": "9"})
         self.assertEqual(schedule.active_target(data), 14.0)
 
+    def test_program_uses_reported_target(self):
+        # Friday 02:05 in P2: the firmware reports the real target in tmpR.
+        data = device_data(mode="2", date="2026-10-16 02:05:50", tmp_r="75")
+        self.assertEqual(schedule.active_target(data), 75.0)
+
+    def test_program_heating_ahead_uses_reported_target(self):
+        # 23:59, the P1 slot is 14 °C, but the heater already works towards a
+        # higher target (75 °C) and reports it in tmpR.
+        data = device_data(mode="1", date="2026-10-13 23:59:00", tmp_r="75")
+        self.assertEqual(schedule.active_target(data), 75.0)
+
+    def test_program_missing_tmp_r_uses_schedule(self):
+        data = device_data(mode="2", tmp_r=None)
+        self.assertEqual(schedule.active_target(data), 19.0)
+
     def test_program_hour_lookup(self):
         data = device_data(mode="1", date="2026-10-13 13:05:00", tmp_r="9")
         self.assertEqual(schedule.active_target(data), 75.0)
@@ -128,8 +143,12 @@ class ActiveTargetTest(TestCase):
         self.assertEqual(schedule.active_target(data, use_schedule=False), 9.0)
 
     def test_unknown_clock_is_unknown(self):
-        data = device_data(mode="1", date="garbage")
+        # Placeholder in tmpR and no device time: the target is unknown.
+        data = device_data(mode="1", date="garbage", tmp_r="9")
         self.assertIsNone(schedule.active_target(data))
+        # A real tmpR does not need the clock.
+        data["tmpR"] = "75"
+        self.assertEqual(schedule.active_target(data), 75.0)
 
     def test_weekday_mapping(self):
         data = device_data(mode="3")
