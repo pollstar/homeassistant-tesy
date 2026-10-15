@@ -64,7 +64,7 @@ After every command sent from Home Assistant the heater is read again about 2 s 
 
 ## Thermostat card
 
-The card is served and loaded by the integration — nothing else to install. It is loaded once a supported heater (see *Extended features* above) is set up; on another model it shows a notice instead of the controls. After installing or updating the integration, restart Home Assistant and reload the browser once (Ctrl+F5; in the companion app: Settings → Debugging → Clear frontend cache).
+The card is served by the integration and registered as a dashboard resource by itself — nothing to install or add under *Resources*. It is registered once a supported heater (see *Extended features* above) is set up; on another model it shows a notice instead of the controls. After installing or updating the integration, restart Home Assistant and reload the browser once (Ctrl+F5; in the companion app: Settings → Debugging → Clear frontend cache).
 
 Add it from **Add card → Tesy boiler**, or with YAML:
 
@@ -114,7 +114,7 @@ The chart button opens energy and diagnostics.
 - **Wi-Fi** signal in dBm, marked *weak* below −67 dBm.
 - **Module uptime**, **clock** state (heater time and time zone compared with Home Assistant) and **firmware** versions.
 
-**Updates and caching.** The card is served with `Cache-Control: no-cache` and an ETag, so browsers and reverse proxies (Cloudflare, nginx) check for a newer file on every page load. A page opened before Home Assistant restarted with a new card (a wall tablet, say) reloads itself once; if that does not help, the card shows a reload banner. A page that never loaded the card needs one manual reload.
+**Updates and caching.** On every start the integration keeps one resource, `/tesy_static/tesy-boiler-card.js?v=<hash>`, in Settings → Dashboards → Resources: the hash changes with the card, so an update gets a new URL. A resource you added by hand for the same path is taken over; one pointing to another copy (in `/local`, say) is left alone with a warning in the log — remove it. With YAML-mode dashboards resources cannot be changed by an integration, so the card is added to every page instead. The resource is removed with the last heater. The card is served with `Cache-Control: no-cache` and an ETag, so browsers and reverse proxies (Cloudflare, nginx) check for a newer file on every page load. A page opened before Home Assistant restarted with a new card (a wall tablet, say) reloads itself once; if that does not help, the card shows a reload banner. A page that never loaded the card needs one manual reload.
 
 ## Entities
 
