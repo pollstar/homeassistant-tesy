@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   tempRole, angleFor, tempFromPoint, scheduleCalls, heaterView, deviceEntities, DAYS,
-  loadedVersion, staleAction, pickLang, cardSupported, markReloaded, errorView, numberLocale, versionCheckDue, wallClock, focusKey, durationSeconds,
+  loadedVersion, staleAction, pickLang, cardSupported, markReloaded, errorView, numberLocale, versionCheckDue, wallClock, focusKey, durationSeconds, formatCurrent,
 } from "../../custom_components/tesy/frontend/tesy-boiler-card.js";
 
 test("temperature roles", () => {
@@ -166,4 +166,12 @@ test("uptime in seconds whatever unit HA displays it in", () => {
   assert.equal(durationSeconds("294", "min"), 17640);
   assert.equal(durationSeconds("2", "d"), 172800);
   for (const [v, u] of [["unavailable", "s"], ["", "s"], [undefined, "s"], ["5", "fortnight"]]) assert.equal(durationSeconds(v, u), null);
+});
+
+test("water temperature has no forced decimal", () => {
+  const ru = { locale: { language: "ru" } };
+  assert.equal(formatCurrent(59, ru), "59");
+  assert.equal(formatCurrent(42.3, ru), "42,3");
+  assert.equal(formatCurrent(42.3, { locale: { language: "en" } }), "42.3");
+  assert.equal(formatCurrent(null, ru), "—");
 });

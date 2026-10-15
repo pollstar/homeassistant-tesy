@@ -10,7 +10,7 @@
  *   entity: water_heater.boiler_modeco_2_heater
  */
 
-export const CARD_VERSION = "0.1.15";
+export const CARD_VERSION = "0.1.16";
 
 export const DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 export const MODES = ["performance", "p1", "p2", "p3", "eco", "ec2", "ec3"];
@@ -465,9 +465,10 @@ function formatTemp(t, s) {
   return `${Math.round(t)} °C`;
 }
 
-function formatCurrent(t, hass) {
+/** Water temperature: whole degrees as reported (tmpC), tenths only if present. */
+export function formatCurrent(t, hass) {
   if (t === null || t === undefined || Number.isNaN(t)) return "—";
-  return new Intl.NumberFormat(numberLocale(uiLanguage(hass)), { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(t);
+  return new Intl.NumberFormat(numberLocale(uiLanguage(hass)), { minimumFractionDigits: 0, maximumFractionDigits: 1 }).format(t);
 }
 
 // ---------------------------------------------------------------- the card
