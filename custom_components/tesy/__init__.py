@@ -57,19 +57,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Follow-up polls and time zone writes must not outlive the entry.
     entry.async_on_unload(coordinator.async_close)
 
-    if coordinator.supports_timezone and entry.options.get(SYNC_TIMEZONE, True):
+    if coordinator.supports_timezone:
         # Keep the heater's time zone (it drives the weekly programs) in step
         # with Home Assistant: now, and whenever the HA time zone changes.
-        # Can be turned off in the options (e.g. HA's own zone is wrong).
-        await _async_sync_timezone(coordinator)
+        # The writes can be turned off in the options (e.g. HA's own zone is
+        # wrong); the expected zone is still followed for the clock sensor.
+        sync = entry.options.get(SYNC_TIMEZONE, True)
 
         @callback
         def _core_config_updated(event: Event) -> None:
-            hass.async_create_task(_async_sync_timezone(coordinator))
+            hass.async_create_task(_async_timezone_changed(coordinator, sync))
 
+        # Listen before the start-up sync, so a change during it is not missed;
+        # syncs run one at a time and the last one writes the newest zone.
         entry.async_on_unload(
             hass.bus.async_listen(EVENT_CORE_CONFIG_UPDATE, _core_config_updated)
         )
+        if sync:
+            await _async_timezone_changed(coordinator, sync)
 
     return True
 
@@ -79,11 +84,16 @@ async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> Non
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def _async_sync_timezone(coordinator: TesyCoordinator) -> None:
-    """Sync the heater time zone, logging instead of failing."""
+async def _async_timezone_changed(coordinator: TesyCoordinator, sync: bool) -> None:
+    """Follow HA's time zone; write it to the heater if sync is on.
+
+    Logs instead of failing.
+    """
     # Resolve the (possibly new) HA zone first so the clock sensor sees it.
     await coordinator.async_expected_timezone()
     coordinator.async_update_listeners()
+    if not sync:
+        return
     try:
         await coordinator.async_sync_timezone()
     except (ConnectionError, ValueError) as err:
