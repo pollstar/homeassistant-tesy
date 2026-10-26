@@ -345,6 +345,12 @@ class TesyWaterHeater(TesyEntity, WaterHeaterEntity):
             key = schedule_key(program, day)
             try:
                 response = await self.coordinator.async_set_schedule(key, value)
+            except ValueError as err:  # not JSON: keep the partial-write context
+                raise HomeAssistantError(
+                    write_failure_message(
+                        program, written, day, "invalid response from heater"
+                    )
+                ) from err
             except (ConnectionError, NotImplementedError) as err:
                 raise HomeAssistantError(
                     write_failure_message(program, written, day, f"{err}")
