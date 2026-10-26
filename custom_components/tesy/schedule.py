@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import Any
 
 DAYS = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")
+ALL_DAYS = tuple(day.lower() for day in DAYS)
 PROGRAMS = (1, 2, 3)
 HOURS_PER_DAY = 24
 EMPTY_SLOT = 0xFF
@@ -57,6 +58,22 @@ def whole_number(value: Any) -> int:
     if not number.is_integer():
         raise ValueError(f"Expected a whole number, got {value!r}")
     return int(number)
+
+
+def days_or_all(days: list[str]) -> list[str]:
+    """Return the days to write; none picked (the UI sends []) means all."""
+    return list(days) or list(ALL_DAYS)
+
+
+def write_failure_message(
+    program: int, written: list[str], day: str, reason: str
+) -> str:
+    """Error for a failed day of a multi-day write, naming the days written.
+
+    Days are written one request at a time, so the earlier ones stay written.
+    """
+    done = f"wrote {', '.join(d.upper() for d in written)}, " if written else ""
+    return f"P{program}: {done}failed at {day.upper()}: {reason}"
 
 
 def decode_day(value: str) -> list[int | None]:

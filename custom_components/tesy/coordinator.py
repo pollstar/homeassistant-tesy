@@ -11,7 +11,12 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .features import FEATURE_CARD, FEATURE_SCHEDULE, FEATURE_TIMEZONE, device_features
+from .features import (
+    FEATURE_READBACK,
+    FEATURE_SCHEDULE,
+    FEATURE_TIMEZONE,
+    device_features,
+)
 from .tesy import Tesy
 from .timezone import TZ_FIELD, posix_tz_for
 from .tesy_oldapi import TesyOldApi
@@ -86,8 +91,10 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Send a command to the heater and read its state back soon after.
 
         The reply only echoes the written field; the heating state, active
-        target, device time and the like follow on the next poll. Every command
-        goes through here, so none of them waits for the regular poll.
+        target, device time and the like follow on the next poll. On models
+        with the read-back verified (features.py) that poll comes ~2 s after
+        the command instead of at the regular interval; other models keep
+        polling at the regular interval only.
 
         A pending poll is cancelled before the command is sent and scheduled
         again once no command is in flight, so a batch (a schedule written day
@@ -102,7 +109,7 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 return await self.hass.async_add_executor_job(func, *args)
         finally:
             self._commands_in_flight -= 1
-            if not self._commands_in_flight:
+            if not self._commands_in_flight and self.supports_readback:
                 self.async_refresh_soon()
 
     @callback
@@ -198,14 +205,14 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return FEATURE_SCHEDULE in self.features
 
     @property
+    def supports_readback(self) -> bool:
+        """Return True if the heater is polled again shortly after a command."""
+        return FEATURE_READBACK in self.features
+
+    @property
     def supports_timezone(self) -> bool:
         """Return True if time zone sync is enabled for this heater."""
         return FEATURE_TIMEZONE in self.features
-
-    @property
-    def supports_card(self) -> bool:
-        """Return True if the thermostat card supports this heater."""
-        return FEATURE_CARD in self.features
 
     @property
     def expected_timezone(self) -> str | None:
@@ -250,8 +257,16 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # The follow-up poll also brings the device time (date) in the new zone.
         response = await self._async_command(self._client.set_timezone, expected)
+        # Report only the type or api value: a reply may include the MAC address
+        if not isinstance(response, dict):
+            raise ConnectionError(
+                f"Invalid response from heater: {type(response).__name__}"
+            )
         if response.get(ATTR_API) != "OK" or response.get(TZ_FIELD) != expected:
-            raise ConnectionError(f"Heater rejected time zone {expected}: {response}")
+            raise ConnectionError(
+                f"Heater rejected time zone {expected}: "
+                f"api={response.get(ATTR_API)!r}"
+            )
 
         _LOGGER.info(
             "Tesy time zone changed from %s to %s", self.data.get(TZ_FIELD), expected
@@ -267,9 +282,24 @@ class TesyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _get_data(self) -> dict[str, Any]:
         """Get new sensor data using Tesy API."""
         try:
-            return self._client.get_data()
+            result = self._client.get_data()
         except ConnectionError as http_error:
-            raise UpdateFailed from http_error
+            cause = http_error.__cause__ or http_error
+            _LOGGER.debug("Cannot reach heater: %r", cause)
+            raise UpdateFailed(
+                f"Cannot reach heater: {type(cause).__name__}"
+            ) from http_error
+        except (ValueError, KeyError, TypeError, AttributeError) as err:
+            # Non-JSON or malformed response
+            raise UpdateFailed(f"Invalid response from heater: {err!r}") from err
+        # Report only the type or api value: the payload includes the MAC address
+        if not isinstance(result, dict):
+            raise UpdateFailed(f"Invalid response from heater: {type(result).__name__}")
+        if result.get(ATTR_API) != "OK":
+            raise UpdateFailed(
+                f"Invalid response from heater: api={result.get(ATTR_API)!r}"
+            )
+        return result
 
     def get_config_power(self) -> int:
         return self._client._heater_power

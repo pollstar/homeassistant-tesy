@@ -164,3 +164,21 @@ class ActiveTargetTest(TestCase):
         self.assertEqual(list(program), ["mo", "tu", "we", "th", "fr", "sa", "su"])
         self.assertEqual(program["mo"][2], 75)
         self.assertIsNone(schedule.get_program({}, 1))
+
+
+class ServiceHelpersTest(TestCase):
+    def test_no_days_means_all_days(self):
+        self.assertEqual(
+            schedule.days_or_all([]), ["mo", "tu", "we", "th", "fr", "sa", "su"]
+        )
+        self.assertEqual(schedule.days_or_all(["sa", "su"]), ["sa", "su"])
+
+    def test_failure_message_names_written_days(self):
+        self.assertEqual(
+            schedule.write_failure_message(2, ["MO"], "tu", "timeout"),
+            "P2: wrote MO, failed at TU: timeout",
+        )
+        self.assertEqual(
+            schedule.write_failure_message(1, [], "mo", "timeout"),
+            "P1: failed at MO: timeout",
+        )

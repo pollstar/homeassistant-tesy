@@ -91,7 +91,7 @@
         },
         "days": {
           "name": "Days",
-          "description": "Days to write. All days if omitted."
+          "description": "Days to write. All days if omitted or none selected."
         },
         "temperatures": {
           "name": "Temperatures",
@@ -118,10 +118,12 @@
       "init": {
         "title": "Options",
         "data": {
-          "scan_interval": "Poll interval, seconds"
+          "scan_interval": "Poll interval, seconds",
+          "sync_timezone": "Sync the heater time zone with Home Assistant"
         },
         "data_description": {
-          "scan_interval": "How often the heater is read (5-300). Changes made on its panel or in MyTESY appear within this time."
+          "scan_interval": "How often the heater is read (5-300; 30-300 on the old API). Changes made on its panel or in MyTESY appear within this time.",
+          "sync_timezone": "Writes Home Assistant's time zone to the heater on start-up and when it changes. The weekly programs run on the heater clock. Turn off if Home Assistant's time zone is not the heater's local time."
         }
       }
     }

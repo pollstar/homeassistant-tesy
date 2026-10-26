@@ -86,12 +86,5 @@ class Tesy:
             _LOGGER.debug(f"Tesy response: {r.text}")
 
             return r
-        except TimeoutError as timeout_error:
-            raise ConnectionError from timeout_error
-        except requests.exceptions.ConnectionError as connection_error:
-            raise ConnectionError from connection_error
-        except requests.exceptions.HTTPError as http_error:
-            raise ConnectionError from http_error
-        except requests.exceptions.RequestException as request_error:
-            # Read timeouts and the like: callers handle ConnectionError only.
-            raise ConnectionError from request_error
+        except (TimeoutError, requests.exceptions.RequestException) as err:
+            raise ConnectionError from err

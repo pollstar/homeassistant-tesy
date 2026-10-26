@@ -9,7 +9,11 @@ _SPEC = spec_from_file_location("tesy_features", _PATH)
 features = module_from_spec(_SPEC)
 _SPEC.loader.exec_module(features)
 
-ALL = {features.FEATURE_SCHEDULE, features.FEATURE_TIMEZONE, features.FEATURE_CARD}
+ALL = {
+    features.FEATURE_SCHEDULE,
+    features.FEATURE_TIMEZONE,
+    features.FEATURE_READBACK,
+}
 PROGRAMS = {
     "id": "2004",
     "tz": "EET-2EEST,M3.5.0/3,M10.5.0/4",
@@ -28,18 +32,17 @@ class DeviceFeaturesTest(TestCase):
             self.assertEqual(features.device_features(data), frozenset(), model)
 
     def test_missing_fields_disable_their_feature(self):
-        self.assertEqual(
-            features.device_features({"id": 2004}), {features.FEATURE_CARD}
-        )
+        # The read-back needs no fields; the others need theirs.
+        readback = features.FEATURE_READBACK
+        self.assertEqual(features.device_features({"id": 2004}), {readback})
         self.assertEqual(
             features.device_features({"id": 2004, "tz": "UTC0"}),
-            {features.FEATURE_TIMEZONE, features.FEATURE_CARD},
+            {features.FEATURE_TIMEZONE, readback},
         )
         # All 21 program days are needed, not just the first one.
         partial = {k: v for k, v in PROGRAMS.items() if k != "prgP3SU"}
         self.assertEqual(
-            features.device_features(partial),
-            {features.FEATURE_TIMEZONE, features.FEATURE_CARD},
+            features.device_features(partial), {features.FEATURE_TIMEZONE, readback}
         )
 
     def test_no_data(self):

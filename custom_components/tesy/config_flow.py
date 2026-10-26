@@ -18,8 +18,9 @@ from .const import (
     IP_ADDRESS,
     HEATER_POWER,
     MAX_SCAN_INTERVAL,
-    MIN_SCAN_INTERVAL,
     SCAN_INTERVAL,
+    SYNC_TIMEZONE,
+    min_scan_interval,
     UPDATE_INTERVAL,
     ATTR_DEVICE_ID,
     TESY_DEVICE_TYPES,
@@ -108,13 +109,21 @@ class TesyOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        current = self._entry.options.get(SCAN_INTERVAL, UPDATE_INTERVAL)
-        schema = vol.Schema(
-            {
-                vol.Required(SCAN_INTERVAL, default=current): vol.All(
-                    vol.Coerce(int),
-                    vol.Range(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL),
+        old_api = bool(self._entry.data.get(USE_OLD_API))
+        minimum = min_scan_interval(old_api)
+        current = max(minimum, self._entry.options.get(SCAN_INTERVAL, UPDATE_INTERVAL))
+        fields: dict[Any, Any] = {
+            vol.Required(SCAN_INTERVAL, default=current): vol.All(
+                vol.Coerce(int),
+                vol.Range(min=minimum, max=MAX_SCAN_INTERVAL),
+            )
+        }
+        if not old_api:  # the old API has no time zone field
+            fields[
+                vol.Required(
+                    SYNC_TIMEZONE,
+                    default=self._entry.options.get(SYNC_TIMEZONE, True),
                 )
-            }
-        )
+            ] = cv.boolean
+        schema = vol.Schema(fields)
         return self.async_show_form(step_id="init", data_schema=schema)

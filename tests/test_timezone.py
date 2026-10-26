@@ -113,14 +113,24 @@ class PosixEvaluationTest(TestCase):
         )
         self.assertFalse(tz.posix_matches_zone(KYIV, "No/Such_Zone", start))
 
+    def test_unusual_transition_times_are_not_synced(self):
+        start = datetime(2026, 10, 14, 10, 0, tzinfo=dt_timezone.utc)
+        # Negative (Nuuk "/-1") and over-24 h (Jerusalem "/26") switch times.
+        self.assertIsNone(tz.posix_tz_for("America/Nuuk", start))
+        self.assertIsNone(tz.posix_tz_for("Asia/Jerusalem", start))
+        self.assertFalse(tz.posix_rule_times_supported("IST-2IDT,M3.4.4/26,M10.5.0"))
+        # 24:00 is within POSIX (America/Santiago).
+        self.assertTrue(
+            tz.posix_rule_times_supported("<-04>4<-03>,M9.1.6/24,M4.1.6/24")
+        )
+        self.assertTrue(tz.posix_rule_times_supported(KYIV))
+
     def test_whole_tz_database_resolves(self):
         start = datetime(2026, 10, 14, 10, 0, tzinfo=dt_timezone.utc)
         for name in (
             "Europe/Kyiv",
             "America/New_York",
             "Australia/Sydney",
-            "America/Nuuk",
-            "Asia/Gaza",
             "America/Santiago",
         ):
             with self.subTest(name=name):

@@ -132,6 +132,25 @@ def posix_matches_zone(
     return True
 
 
+# Transition times POSIX.1 allows (0-24 h). The tz database also uses the
+# extension to negative and over-24 h times (America/Nuuk "/-1",
+# Asia/Jerusalem "/26"); the heater firmware is not known to handle those, so
+# such zones are not synced.
+_MAX_RULE_TIME = 24 * 3600
+
+
+def posix_rule_times_supported(posix: str) -> bool:
+    """Return True if the string's transition times are within 0-24 h."""
+    match = _POSIX_FULL.match(posix or "")
+    if not match:
+        return False
+    for rule in (match["start"], match["end"]):
+        _, _, at = (rule or "").partition("/")
+        if at and not 0 <= _seconds(at) <= _MAX_RULE_TIME:
+            return False
+    return True
+
+
 def _tzif_candidates(name: str):
     parts = name.split("/")
     for root in zoneinfo.TZPATH:
@@ -145,8 +164,9 @@ def _tzif_candidates(name: str):
 def posix_tz_for(name: str | None, now: datetime | None = None) -> str | None:
     """Return the POSIX TZ string for an IANA zone name such as Europe/Kyiv.
 
-    None if there is none, or if it does not reproduce the zone's offsets for
-    the coming months (the zone then cannot be synced to the heater).
+    None if there is none, if it does not reproduce the zone's offsets for
+    the coming months, or if it uses transition times outside 0-24 h (the zone
+    then cannot be synced to the heater).
     """
     if not name or not _IANA_NAME.match(name) or ".." in name:
         return None
@@ -157,6 +177,8 @@ def posix_tz_for(name: str | None, now: datetime | None = None) -> str | None:
             continue
         result = posix_tz_from_tzif(content)
         if result:
+            if not posix_rule_times_supported(result):
+                return None
             return result if posix_matches_zone(result, name, now) else None
     return None
 

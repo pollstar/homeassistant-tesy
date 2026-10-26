@@ -30,7 +30,6 @@ from .const import (
     ATTR_CURRENT_TEMP,
     ATTR_CURRENT_TARGET_TEMP,
     ATTR_DEVICE_ID,
-    ATTR_MAX_SHOWERS,
     ATTR_IS_HEATING,
     ATTR_MODE,
     ATTR_POWER,
@@ -44,6 +43,7 @@ from .const import (
 )
 
 from .entity import TesyEntity
+from .helpers import TESY_MODE_TO_OPERATION, max_showers, tesy_mode, to_float
 from .schedule import (
     DAYS,
     HOURS_PER_DAY,
@@ -51,11 +51,14 @@ from .schedule import (
     MIN_SLOT_TEMP,
     PROGRAMS,
     active_program,
+    ALL_DAYS,
     active_target,
+    days_or_all,
     encode_day,
     get_program,
     schedule_key,
     whole_number,
+    write_failure_message,
 )
 
 SERVICE_SET_SCHEDULE = "set_schedule"
@@ -74,10 +77,11 @@ def _whole_number(value: Any) -> int:
 
 SET_SCHEDULE_SCHEMA = {
     vol.Required(ATTR_PROGRAM): vol.All(_whole_number, vol.In(PROGRAMS)),
-    vol.Optional(ATTR_DAYS, default=[day.lower() for day in DAYS]): vol.All(
+    vol.Optional(ATTR_DAYS, default=list(ALL_DAYS)): vol.All(
         cv.ensure_list,
-        vol.Length(min=1, max=len(DAYS)),
-        [vol.All(cv.string, vol.Lower, vol.In([d.lower() for d in DAYS]))],
+        vol.Length(max=len(DAYS)),
+        [vol.All(cv.string, vol.Lower, vol.In(ALL_DAYS))],
+        days_or_all,
     ),
     vol.Required(ATTR_TEMPERATURES): vol.All(
         cv.ensure_list,
@@ -114,13 +118,14 @@ async def async_setup_entry(
     """Create Tesy water heater in HASS."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
 
-    if coordinator.supports_schedule:
-        platform = entity_platform.async_get_current_platform()
-        platform.async_register_entity_service(
-            SERVICE_SET_SCHEDULE,
-            SET_SCHEDULE_SCHEMA,
-            "async_set_schedule",
-        )
+    # Registered for every heater, so the action exists even if the first poll
+    # lacked the program fields; async_set_schedule rejects unsupported ones.
+    platform = entity_platform.async_get_current_platform()
+    platform.async_register_entity_service(
+        SERVICE_SET_SCHEDULE,
+        SET_SCHEDULE_SCHEMA,
+        "async_set_schedule",
+    )
 
     async_add_entities(
         [
@@ -182,9 +187,8 @@ class TesyWaterHeater(TesyEntity, WaterHeaterEntity):
                 ]
                 == True
             ):
-                tmp_max = self.coordinator.data[ATTR_MAX_SHOWERS]
-                self._attr_max_temp = (
-                    int(tmp_max) if tmp_max.isdecimal() else self._attr_max_temp
+                self._attr_max_temp = max_showers(
+                    self.coordinator.data, self._attr_max_temp
                 )
 
     @property
@@ -199,7 +203,7 @@ class TesyWaterHeater(TesyEntity, WaterHeaterEntity):
     @property
     def current_temperature(self):
         """Return the current temperature."""
-        return float(self.coordinator.data[ATTR_CURRENT_TEMP])
+        return to_float(self.coordinator.data.get(ATTR_CURRENT_TEMP))
 
     @property
     def current_operation(self):
@@ -215,25 +219,8 @@ class TesyWaterHeater(TesyEntity, WaterHeaterEntity):
         if self.coordinator.data[ATTR_POWER] != "1":
             return STATE_OFF
 
-        mode = self.coordinator.data[ATTR_MODE]
-
-        if mode == "0":
-            return STATE_PERFORMANCE
-        if mode == "1":
-            return TESY_MODE_P1
-        if mode == "2":
-            return TESY_MODE_P2
-        if mode == "3":
-            return TESY_MODE_P3
-        if mode == "4":
-            return STATE_ECO
-        if mode == "5":
-            return TESY_MODE_EC2
-        if mode == "6":
-            return TESY_MODE_EC3
-
-        # Handle unknown state
-        return STATE_OFF
+        # Unknown modes are reported as off
+        return TESY_MODE_TO_OPERATION.get(self.coordinator.data[ATTR_MODE], STATE_OFF)
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature."""
@@ -269,24 +256,12 @@ class TesyWaterHeater(TesyEntity, WaterHeaterEntity):
             response = await self.coordinator.async_set_power("0")
             await self.partially_update_data_from_api(response, ATTR_POWER)
         else:
+            # Raises ValueError for an unknown mode, before anything is sent
+            new_mode = tesy_mode(operation_mode)
+
             if self.coordinator.data[ATTR_POWER] == "0":
                 response = await self.coordinator.async_set_power("1")
                 await self.partially_update_data_from_api(response, ATTR_POWER)
-
-            if operation_mode == STATE_PERFORMANCE:
-                new_mode = "0"
-            elif operation_mode == TESY_MODE_P1:
-                new_mode = "1"
-            elif operation_mode == TESY_MODE_P2:
-                new_mode = "2"
-            elif operation_mode == TESY_MODE_P3:
-                new_mode = "3"
-            elif operation_mode == STATE_ECO:
-                new_mode = "4"
-            elif operation_mode == TESY_MODE_EC2:
-                new_mode = "5"
-            elif operation_mode == TESY_MODE_EC3:
-                new_mode = "6"
 
             response = await self.coordinator.async_set_operation_mode(new_mode)
             await self.partially_update_data_from_api(
@@ -336,13 +311,15 @@ class TesyWaterHeater(TesyEntity, WaterHeaterEntity):
 
         features = self.coordinator.features
         if features:
-            # Lets the card tell a supported heater from one with basic control.
+            # Lets dashboards tell a heater with extended features from one
+            # with basic control.
             attributes["tesy_features"] = sorted(features)
 
         if self.coordinator.supports_schedule:
             # Setpoint used in manual mode, kept while another mode is active.
-            if ATTR_TARGET_TEMP in data:
-                attributes["manual_temperature"] = int(data[ATTR_TARGET_TEMP])
+            manual = to_float(data.get(ATTR_TARGET_TEMP))
+            if manual is not None:
+                attributes["manual_temperature"] = manual
             attributes["active_program"] = active_program(data)
             for program in PROGRAMS:
                 attributes[f"schedule_p{program}"] = get_program(data, program)
@@ -363,17 +340,24 @@ class TesyWaterHeater(TesyEntity, WaterHeaterEntity):
         except ValueError as err:
             raise ServiceValidationError(str(err)) from err
 
+        written: list[str] = []
         for day in days:
             key = schedule_key(program, day)
             try:
                 response = await self.coordinator.async_set_schedule(key, value)
             except (ConnectionError, NotImplementedError) as err:
                 raise HomeAssistantError(
-                    f"Failed to write {key} to the heater: {err}"
+                    write_failure_message(program, written, day, f"{err}")
                 ) from err
 
-            if response.get("api") != "OK" or response.get(key) != value:
+            # Report only the api value: a reply may include the MAC address
+            ok = isinstance(response, dict)
+            if not ok or response.get("api") != "OK" or response.get(key) != value:
+                api = response.get("api") if ok else type(response).__name__
                 raise HomeAssistantError(
-                    f"Heater rejected {key}: {response.get('api', response)}"
+                    write_failure_message(
+                        program, written, day, f"rejected by the heater (api={api!r})"
+                    )
                 )
             await self.partially_update_data_from_api(response, key)
+            written.append(day.upper())
