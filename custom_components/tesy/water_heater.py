@@ -352,8 +352,13 @@ class TesyWaterHeater(TesyEntity, WaterHeaterEntity):
                     )
                 ) from err
             except (ConnectionError, NotImplementedError) as err:
+                # The client wraps transport errors in a bare ConnectionError:
+                # name the cause then (e.g. ReadTimeout), like the poll does.
+                reason = str(err) or (
+                    f"cannot reach heater: {type(err.__cause__ or err).__name__}"
+                )
                 raise HomeAssistantError(
-                    write_failure_message(program, written, day, f"{err}")
+                    write_failure_message(program, written, day, reason)
                 ) from err
 
             # Report only the api value: a reply may include the MAC address
