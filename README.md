@@ -90,6 +90,7 @@ Attributes: `is_heating`, and on models with extended features:
 | `schedule_p1` … `schedule_p3` | `{"mo": [24 values], …, "su": [...]}`: °C per hour from 00:00; `14` = heating off for that hour (❄ in MyTESY), `null` = no entry. Not stored in history. |
 | `active_program` | `1`–`3` while a program runs, otherwise `null` |
 | `manual_temperature` | Setpoint kept for manual mode |
+| `reported_target` | Target as the heater reports it (`tmpR`, raw: `9` while it idles in a program). For diagnostics |
 | `tesy_features` | Extended features enabled for this heater, e.g. `["readback", "schedule", "timezone"]`. Not stored in history. |
 
 ### Sensors
