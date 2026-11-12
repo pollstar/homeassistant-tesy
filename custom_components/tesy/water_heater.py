@@ -344,6 +344,9 @@ class TesyWaterHeater(TesyEntity, WaterHeaterEntity):
             if manual is not None and not self._showers:
                 attributes["manual_temperature"] = manual
             attributes["active_program"] = active_program(data)
+            # Fork only: raw tmpR as the heater reports it (9 while it idles in
+            # a program), kept in history to study how it changes around the hour.
+            attributes["reported_target"] = to_float(data.get(ATTR_CURRENT_TARGET_TEMP))
             for program in PROGRAMS:
                 attributes[f"schedule_p{program}"] = get_program(
                     data, program, self._showers

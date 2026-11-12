@@ -1,5 +1,12 @@
 # Home Assistant Tesy integration
 
+> **Fork of [krasnoukhov/homeassistant-tesy](https://github.com/krasnoukhov/homeassistant-tesy)** by [@pollstar](https://github.com/pollstar). It follows the upstream code and adds:
+>
+> - a **Russian translation** (`ru.json`), which upstream removed;
+> - a diagnostic water heater attribute **`reported_target`** on models with weekly programs: the raw `tmpR` as the heater reports it (`9` while it idles in a program), kept in history to study how the target changes around the hour.
+>
+> Everything else, including the documentation below, is upstream's. Report bugs in the upstream code [there](https://github.com/krasnoukhov/homeassistant-tesy/issues). The dashboard card is a separate repository: [tesy-boiler-card](https://github.com/pollstar/tesy-boiler-card).
+
 <h3>⚠️ WARNING:  This integration does not currently support BiLight Cloud B15 as it uses different hardware lacking local API.</h3>
 
 
@@ -266,7 +273,7 @@ Extended features are enabled per model in [`features.py`](custom_components/tes
 
 ## Translations
 
-Available in 9 languages: English, Bulgarian, German, French, Dutch, Spanish, Italian, Turkish, Ukrainian. Operation modes, sensors, switches, buttons, and config flow are all translated.
+Available in 10 languages: English, Bulgarian, German, French, Dutch, Spanish, Italian, Turkish, Ukrainian and, in this fork, Russian. Operation modes, sensors, switches, buttons, and config flow are all translated.
 
 ## Contributors
 
